@@ -170,7 +170,7 @@ int main() {
   vector<double> map_waypoints_dy;
 
   // Waypoint map to read from
-  string map_file_ = "../data/highway_map.csv";
+  string map_file_ = "data/highway_map.csv";
   // The max s value before wrapping around the track back to 0
   double max_s = 6945.554;
 
@@ -237,7 +237,17 @@ int main() {
 
           	vector<double> next_x_vals;
           	vector<double> next_y_vals;
-
+            
+            double dist_inc = 0.44;
+            for(int i = 0; i < 50; i++)
+            {
+              double next_s = car_s + (i+1) * dist_inc;
+              double next_d = 6;
+              vector<double> xy = getXY(next_s, next_d, map_waypoints_s, map_waypoints_x, map_waypoints_y);
+              
+              next_x_vals.push_back(xy[0]); //car_x+(dist_inc*i)*cos(deg2rad(car_yaw)));
+              next_y_vals.push_back(xy[1]); //car_y+(dist_inc*i)*sin(deg2rad(car_yaw)));
+            }
 
           	// TODO: define a path made up of (x,y) points that the car will visit sequentially every .02 seconds
           	msgJson["next_x"] = next_x_vals;
