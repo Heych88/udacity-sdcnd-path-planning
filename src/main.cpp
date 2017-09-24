@@ -250,7 +250,7 @@ int main() {
               
               path_y_vals.push_back(car_y - sin(car_yaw));
               path_y_vals.push_back(car_y);
-            }else{
+            } else {
               double last_x = previous_path_x[prev_size - 1];
               double last_y = previous_path_y[prev_size - 1];
               double prev_x = previous_path_x[prev_size - 2];
@@ -265,9 +265,8 @@ int main() {
               path_y_vals.push_back(previous_path_y[prev_size - 1]);
             }
 
-            for(int i = 0; i < 3; i++)
-            {
-              double next_s = car_s + (i+1) * 30;
+            for(int i = 0; i < 4; i++){
+              double next_s = car_s + (i+1) * 25;
               double next_d = 2 + 4 * lane;
               vector<double> xy = getXY(next_s, next_d, map_waypoints_s, map_waypoints_x, map_waypoints_y);
               
@@ -275,7 +274,7 @@ int main() {
               path_y_vals.push_back(xy[1]); 
             }
               
-            //cout << "new size " <<path_x_vals.size() << "  prev_size " << prev_size << endl;
+            //cout << "new x size " <<path_x_vals.size() << "  new x size  " << path_y_vals.size() << "  prev_size " << prev_size <<  endl;
             tk::spline s;
             s.set_points(path_x_vals, path_y_vals);
 
@@ -286,20 +285,18 @@ int main() {
               next_x_vals.push_back(previous_path_x[i]);
               next_y_vals.push_back(previous_path_y[i]);
             }
-            
+            //cout << "first next_x_vals size " << next_x_vals.size() << endl;
             double dist_inc = 0.44;
-            for(int i = 1; i < 50; i++)
-            {
+            for(int i = next_x_vals.size(); i < 50; i++){
               double next_s = car_s + (i+1) * dist_inc;
               double next_d = 6;
               vector<double> xy = getXY(next_s, next_d, map_waypoints_s, map_waypoints_x, map_waypoints_y);
               
               next_x_vals.push_back(xy[0]); //car_x+(dist_inc*i)*cos(deg2rad(car_yaw)));
               next_y_vals.push_back(s(xy[0])); //car_y+(dist_inc*i)*sin(deg2rad(car_yaw)));
-              
-              //cout << "  S" << i << " " << s(xy[0]) << "  Y " << xy[1];
             }
-            //cout << endl<<endl;
+            //cout << endl << "next_x_vals size " << next_x_vals.size() << endl;
+            //cout << endl << endl;
             
           	// TODO: define a path made up of (x,y) points that the car will visit sequentially every .02 seconds
           	msgJson["next_x"] = next_x_vals;
