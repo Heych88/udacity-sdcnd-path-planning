@@ -249,10 +249,17 @@ int main() {
               ref_y = car_y;
               ref_yaw = deg2rad(car_yaw);
               
-              ptsx.push_back(ref_x - cos(ref_yaw));
-              ptsx.push_back(ref_x);
-              ptsy.push_back(ref_y - sin(ref_yaw));
-              ptsy.push_back(ref_y);
+              // store the cars previous coordinates and transform them into the cars reference frame
+              double shift_x = (ref_x - cos(ref_yaw)) - ref_x;
+              double shift_y = (ref_y - sin(ref_yaw)) - ref_y;
+              
+              ptsx.push_back(shift_x*cos(0-ref_yaw) - shift_y*sin(0-ref_yaw));
+              ptsy.push_back(shift_x*sin(0-ref_yaw) + shift_y*cos(0-ref_yaw));
+
+              // store the cars current coordinates and transform them into the cars reference frame
+              // since the current car coordinates are the origin store (0,0) 
+              ptsx.push_back(0);
+              ptsy.push_back(0);
             } else {
               ref_x = previous_path_x[prev_size - 1];
               ref_y = previous_path_y[prev_size - 1];
@@ -261,31 +268,28 @@ int main() {
               
               ref_yaw = atan2(ref_y - ref_y_prev, ref_x - ref_x_prev);
               
-              ptsx.push_back(ref_x_prev); // 2nd last xpath point
-              ptsx.push_back(ref_x); // last point of the calculated path from last iteration
-              ptsy.push_back(ref_y_prev);
-              ptsy.push_back(ref_y);
+              // store the cars previous coordinates and transform them into the cars reference frame
+              double shift_x = ref_x_prev - ref_x;
+              double shift_y = ref_y_prev - ref_y;
+              
+              ptsx.push_back(shift_x*cos(0-ref_yaw) - shift_y*sin(0-ref_yaw));
+              ptsy.push_back(shift_x*sin(0-ref_yaw) + shift_y*cos(0-ref_yaw));
+
+              // store the cars current coordinates and transform them into the cars reference frame
+              // since the current car coordinates are the origin store (0,0) 
+              ptsx.push_back(0);
+              ptsy.push_back(0);
             }
 
             double next_d = 2 + 4 * lane;
-            vector<double> wpts0 = getXY(car_s+30, next_d, map_waypoints_s, map_waypoints_x, map_waypoints_y);
-            vector<double> wpts1 = getXY(car_s+60, next_d, map_waypoints_s, map_waypoints_x, map_waypoints_y);
-            vector<double> wpts2 = getXY(car_s+90, next_d, map_waypoints_s, map_waypoints_x, map_waypoints_y);
-
-            ptsx.push_back(wpts0[0]);
-            ptsx.push_back(wpts1[0]);
-            ptsx.push_back(wpts2[0]);
-            
-            ptsy.push_back(wpts0[1]);
-            ptsy.push_back(wpts1[1]);
-            ptsy.push_back(wpts2[1]);
-            
-            for(int i=0; i < ptsx.size(); i++){
-              double shift_x = ptsx[i] - ref_x;
-              double shift_y = ptsy[i] - ref_y;
+            for(int i=1; i <= 3; i++){
+              vector<double> xy_pts = getXY(car_s+(i*30), next_d, map_waypoints_s, map_waypoints_x, map_waypoints_y);
               
-              ptsx[i] = shift_x*cos(0-ref_yaw) - shift_y*sin(0-ref_yaw);
-              ptsy[i] = shift_x*sin(0-ref_yaw) + shift_y*cos(0-ref_yaw);
+              double shift_x = xy_pts[0] - ref_x;
+              double shift_y = xy_pts[1] - ref_y;
+            
+              ptsx.push_back(shift_x*cos(0-ref_yaw) - shift_y*sin(0-ref_yaw));
+              ptsy.push_back(shift_x*sin(0-ref_yaw) + shift_y*cos(0-ref_yaw));
             }
 
             tk::spline s;
