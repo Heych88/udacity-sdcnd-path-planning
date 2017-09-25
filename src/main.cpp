@@ -198,9 +198,10 @@ int main() {
   }
   
   unsigned int lane = 1;
-  int ref_vel = 49.5;
+  double ref_vel = 0;
+  double max_vel = 49.5;
 
-  h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy, &lane, &ref_vel](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
+  h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy, &lane, &ref_vel, &max_vel](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                      uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
@@ -241,8 +242,44 @@ int main() {
             
             int prev_size = previous_path_x.size(); 
             double global_yaw, global_x, global_y;
+            const double mile_ph_to_meter_ps = 0.44704; // 1Mph * 1609.344meter/h / 3600 = 0.44704 m/s
             vector<double> ptsx;
           	vector<double> ptsy;
+            
+            bool too_close = false;
+            
+            if(prev_size >0){
+              car_s = end_path_s;
+            }
+            
+            for(int i=0; i < sensor_fusion.size(); i++){
+              // car is in my lane
+              float d = sensor_fusion[i][6];
+              if(d < (2*4*lane+1.9) && d > (2+4*lane-1.9)){
+                double vx = sensor_fusion[i][3];
+                double vy = sensor_fusion[i][4];
+                double check_speed = sqrt(vx*vx + vy*vy);
+                double check_car_s = sensor_fusion[i][5];
+                
+                check_car_s += (double)prev_size * 0.02 * check_speed;
+                
+                if((check_car_s > car_s) && (check_car_s - car_s < 30)){
+                  too_close = true;
+                } 
+              }
+            }
+            
+            if(too_close){
+              ref_vel -= mile_ph_to_meter_ps; // deceleration -5m/s
+              if(ref_vel < 0){
+                ref_vel = 0;
+              }
+            } else if(ref_vel <= max_vel){
+              ref_vel += mile_ph_to_meter_ps; // acceleration 5m/s
+              if(ref_vel > max_vel){
+                ref_vel = max_vel;
+              }
+            }
             
             // check if there are previous way points that can be used 
             if(prev_size < 2){
@@ -313,7 +350,7 @@ int main() {
             double target_dist = sqrt(target_x*target_x + target_y*target_y);
             // find the number of step points to look the target distance into the future
             // distance(m) = Time_step(s) * desired_vel(Mph) * Mph_to_mps(1609.344/3600 = 0.44704) 
-            double N = (target_dist/(0.02*ref_vel*0.44704));
+            double N = (target_dist/(0.02*ref_vel*mile_ph_to_meter_ps));
             double step = target_x/N;
             double x_local = 0; // the current x point being considered
             
