@@ -244,6 +244,7 @@ int main() {
             vector<double> ptsx;
           	vector<double> ptsy;
             
+            // check if there are previous way points that can be used 
             if(prev_size < 2){
               global_x = car_x;
               global_y = car_y;
@@ -281,10 +282,13 @@ int main() {
               ptsy.push_back(0);
             }
 
-            double next_d = 2 + 4 * lane;
+            // Frenet coordinates are referenced from the center yellow lines and positive d being on the right.
+            double next_d = 2 + 4 * lane; //calculate the cars center d position based on the desired lane
+            // get select way points in the future to predict a spline functions for the desired path  
             for(int i=1; i <= 3; i++){
               vector<double> xy_pts = getXY(car_s+(i*30), next_d, map_waypoints_s, map_waypoints_x, map_waypoints_y);
               
+              // convert these future points into car centric coordinates
               double shift_x = xy_pts[0] - global_x;
               double shift_y = xy_pts[1] - global_y;
             
@@ -294,7 +298,7 @@ int main() {
 
           	vector<double> next_x_vals;
           	vector<double> next_y_vals;
-            
+            // Store the unused old way points to create a smooth path transition
             for(int i=0; i < prev_size; i++){
               next_x_vals.push_back(previous_path_x[i]);
               next_y_vals.push_back(previous_path_y[i]);
