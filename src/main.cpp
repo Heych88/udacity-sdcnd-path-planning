@@ -240,40 +240,40 @@ int main() {
           	json msgJson;
             
             int prev_size = previous_path_x.size(); 
-            double ref_yaw, ref_x, ref_y;
+            double global_yaw, global_x, global_y;
             vector<double> ptsx;
           	vector<double> ptsy;
             
             if(prev_size < 2){
-              ref_x = car_x;
-              ref_y = car_y;
-              ref_yaw = deg2rad(car_yaw);
+              global_x = car_x;
+              global_y = car_y;
+              global_yaw = deg2rad(car_yaw);
               
               // store the cars previous coordinates and transform them into the cars reference frame
-              double shift_x = (ref_x - cos(ref_yaw)) - ref_x;
-              double shift_y = (ref_y - sin(ref_yaw)) - ref_y;
+              double shift_x = (global_x - cos(global_yaw)) - global_x;
+              double shift_y = (global_y - sin(global_yaw)) - global_y;
               
-              ptsx.push_back(shift_x*cos(0-ref_yaw) - shift_y*sin(0-ref_yaw));
-              ptsy.push_back(shift_x*sin(0-ref_yaw) + shift_y*cos(0-ref_yaw));
+              ptsx.push_back(shift_x*cos(0-global_yaw) - shift_y*sin(0-global_yaw));
+              ptsy.push_back(shift_x*sin(0-global_yaw) + shift_y*cos(0-global_yaw));
 
               // store the cars current coordinates and transform them into the cars reference frame
               // since the current car coordinates are the origin store (0,0) 
               ptsx.push_back(0);
               ptsy.push_back(0);
             } else {
-              ref_x = previous_path_x[prev_size - 1];
-              ref_y = previous_path_y[prev_size - 1];
-              double ref_x_prev = previous_path_x[prev_size - 2];
-              double ref_y_prev = previous_path_y[prev_size - 2];
+              global_x = previous_path_x[prev_size - 1];
+              global_y = previous_path_y[prev_size - 1];
+              double global_x_prev = previous_path_x[prev_size - 2];
+              double global_y_prev = previous_path_y[prev_size - 2];
               
-              ref_yaw = atan2(ref_y - ref_y_prev, ref_x - ref_x_prev);
+              global_yaw = atan2(global_y - global_y_prev, global_x - global_x_prev);
               
               // store the cars previous coordinates and transform them into the cars reference frame
-              double shift_x = ref_x_prev - ref_x;
-              double shift_y = ref_y_prev - ref_y;
+              double shift_x = global_x_prev - global_x;
+              double shift_y = global_y_prev - global_y;
               
-              ptsx.push_back(shift_x*cos(0-ref_yaw) - shift_y*sin(0-ref_yaw));
-              ptsy.push_back(shift_x*sin(0-ref_yaw) + shift_y*cos(0-ref_yaw));
+              ptsx.push_back(shift_x*cos(0-global_yaw) - shift_y*sin(0-global_yaw));
+              ptsy.push_back(shift_x*sin(0-global_yaw) + shift_y*cos(0-global_yaw));
 
               // store the cars current coordinates and transform them into the cars reference frame
               // since the current car coordinates are the origin store (0,0) 
@@ -285,15 +285,12 @@ int main() {
             for(int i=1; i <= 3; i++){
               vector<double> xy_pts = getXY(car_s+(i*30), next_d, map_waypoints_s, map_waypoints_x, map_waypoints_y);
               
-              double shift_x = xy_pts[0] - ref_x;
-              double shift_y = xy_pts[1] - ref_y;
+              double shift_x = xy_pts[0] - global_x;
+              double shift_y = xy_pts[1] - global_y;
             
-              ptsx.push_back(shift_x*cos(0-ref_yaw) - shift_y*sin(0-ref_yaw));
-              ptsy.push_back(shift_x*sin(0-ref_yaw) + shift_y*cos(0-ref_yaw));
+              ptsx.push_back(shift_x*cos(0-global_yaw) - shift_y*sin(0-global_yaw));
+              ptsy.push_back(shift_x*sin(0-global_yaw) + shift_y*cos(0-global_yaw));
             }
-
-            tk::spline s;
-            s.set_points(ptsx, ptsy);
 
           	vector<double> next_x_vals;
           	vector<double> next_y_vals;
@@ -302,27 +299,33 @@ int main() {
               next_x_vals.push_back(previous_path_x[i]);
               next_y_vals.push_back(previous_path_y[i]);
             }
+            
+            // create a function that intersects all points on the desired path
+            tk::spline f_spline;
+            f_spline.set_points(ptsx, ptsy);
 
             double target_x = 30.0;
-            double target_y = s(target_x);
+            double target_y = f_spline(target_x);
             double target_dist = sqrt(target_x*target_x + target_y*target_y);
-            double x_add_on = 0;
+            // find the number of step points to look the target distance into the future
+            // distance(m) = Time_step(s) * desired_vel(Mph) * Mph_to_mps(1609.344/3600 = 0.44704) 
+            double N = (target_dist/(0.02*ref_vel*0.44704));
+            double step = target_x/N;
+            double x_local = 0; // the current x point being considered
             
-            for(int i = 1; i < 50-previous_path_x.size(); i++){
-              double N = (target_dist/(0.02*ref_vel/2.24));
-              double x_point = x_add_on + target_x/N;
-              double y_point = s(x_point);
+            int way_pts_tot = 50; // how many way points are to be predicted into the future 
+            
+            // add new points onto the old way points upto 
+            for(int i = 1; i < way_pts_tot - prev_size; i++){
+              x_local += step;
+              double y_local = f_spline(x_local);
               
-              x_add_on = x_point;
+              // convert the reference point from local car centric coordinates to global coordinates
+              double x_point = x_local * cos(global_yaw) - y_local * sin(global_yaw);
+              double y_point = x_local * sin(global_yaw) + y_local * cos(global_yaw);
               
-              double x_ref = x_point;
-              double y_ref = y_point;
-              
-              x_point = x_ref * cos(ref_yaw) - y_ref * sin(ref_yaw);
-              y_point = x_ref * sin(ref_yaw) + y_ref * cos(ref_yaw);
-              
-              next_x_vals.push_back((x_point + ref_x)); //xy[0]); //car_x+(dist_inc*i)*cos(deg2rad(car_yaw)));
-              next_y_vals.push_back((y_point + ref_y)); //s(xy[0])); //car_y+(dist_inc*i)*sin(deg2rad(car_yaw)));
+              next_x_vals.push_back(x_point + global_x);
+              next_y_vals.push_back(y_point + global_y);
             }
             
           	// TODO: define a path made up of (x,y) points that the car will visit sequentially every .02 seconds
