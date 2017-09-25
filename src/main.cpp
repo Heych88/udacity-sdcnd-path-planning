@@ -198,7 +198,7 @@ int main() {
   }
   
   unsigned int lane = 1;
-  double ref_vel = 0;
+  double ref_vel = 49.5;
   double max_vel = 49.5;
 
   h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy, &lane, &ref_vel, &max_vel](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
@@ -255,7 +255,7 @@ int main() {
             for(int i=0; i < sensor_fusion.size(); i++){
               // car is in my lane
               float d = sensor_fusion[i][6];
-              if(d < (2*4*lane+1.9) && d > (2+4*lane-1.9)){
+              if(d < (2*4*lane+1.8) && d > (2+4*lane-1.8)){
                 double vx = sensor_fusion[i][3];
                 double vy = sensor_fusion[i][4];
                 double check_speed = sqrt(vx*vx + vy*vy);
@@ -268,19 +268,7 @@ int main() {
                 } 
               }
             }
-            
-            if(too_close){
-              ref_vel -= mile_ph_to_meter_ps; // deceleration -5m/s
-              if(ref_vel < 0){
-                ref_vel = 0;
-              }
-            } else if(ref_vel <= max_vel){
-              ref_vel += mile_ph_to_meter_ps; // acceleration 5m/s
-              if(ref_vel > max_vel){
-                ref_vel = max_vel;
-              }
-            }
-            
+
             // check if there are previous way points that can be used 
             if(prev_size < 2){
               global_x = car_x;
@@ -340,7 +328,7 @@ int main() {
               next_x_vals.push_back(previous_path_x[i]);
               next_y_vals.push_back(previous_path_y[i]);
             }
-            
+
             // create a function that intersects all points on the desired path
             tk::spline f_spline;
             f_spline.set_points(ptsx, ptsy);
@@ -351,13 +339,40 @@ int main() {
             // find the number of step points to look the target distance into the future
             // distance(m) = Time_step(s) * desired_vel(Mph) * Mph_to_mps(1609.344/3600 = 0.44704) 
             double N = (target_dist/(0.02*ref_vel*mile_ph_to_meter_ps));
-            double step = target_x/N;
+            double max_step = target_x/N;
             double x_local = 0; // the current x point being considered
             
+            double acceleration = 0.003; //9 * 0.02; // max allowed acceleration per step
             int way_pts_tot = 50; // how many way points are to be predicted into the future 
+            
+            double step;
+            int next_size = next_x_vals.size();
+            // get the previous step between the last two previous trajectory points and set
+            // that as the step size to prevent excess acceleration and jerk 
+            if(next_size < 2){
+              step = 0;
+            } else {
+              double step_x = next_x_vals[next_size - 1] - next_x_vals[next_size - 2];
+              double step_y = next_y_vals[next_size - 1] - next_y_vals[next_size - 2];
+              step = sqrt(step_x*step_x + step_y*step_y);
+            }
             
             // add new points onto the old way points upto 
             for(int i = 1; i < way_pts_tot - prev_size; i++){
+              
+              // check if we will potential have a collision and decelerate 
+              if(too_close){
+                step -= acceleration; // deceleration -5m/s
+                if(step < 0){
+                  step = 0;
+                }
+              } else if(car_speed <= max_vel){
+                step += acceleration;
+                if(step > max_step){
+                  step = max_step;
+                }
+              } 
+              
               x_local += step;
               double y_local = f_spline(x_local);
               
