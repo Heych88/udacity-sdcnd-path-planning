@@ -196,12 +196,11 @@ int main() {
   	map_waypoints_dx.push_back(d_x);
   	map_waypoints_dy.push_back(d_y);
   }
-  
-  unsigned int lane = 1;
+
   double ref_vel = 49.5;
   double max_vel = 49.5;
 
-  h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy, &lane, &ref_vel, &max_vel](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
+  h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy, &ref_vel, &max_vel](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                      uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
@@ -251,11 +250,12 @@ int main() {
             if(prev_size >0){
               car_s = end_path_s;
             }
-            
+
+            int lane = car_d / 4;
             for(int i=0; i < sensor_fusion.size(); i++){
               // car is in my lane
               float d = sensor_fusion[i][6];
-              if(d < (2*4*lane+1.8) && d > (2+4*lane-1.8)){
+              if(d < (2+4*lane+1.8) && d > (2+4*lane-1.8)){                
                 double vx = sensor_fusion[i][3];
                 double vy = sensor_fusion[i][4];
                 double check_speed = sqrt(vx*vx + vy*vy);
@@ -263,8 +263,23 @@ int main() {
                 
                 check_car_s += (double)prev_size * 0.02 * check_speed;
                 
-                if((check_car_s > car_s) && (check_car_s - car_s < 30)){
-                  too_close = true;
+                if((check_car_s > car_s) && (check_car_s - car_s < 30)){ 
+                  // change lane if there is a car in the current lane
+                  if(lane > 0){
+                    lane--;
+                    if(lane < 0){
+                      lane = 0;
+                    }
+                  } else {
+                    lane++;
+                    if(lane > 2){
+                      lane = 2;
+                    }
+                  }
+                  if((check_car_s > car_s) && (check_car_s - car_s < 20)){
+                    // slow down if the car infront is less than 20m ahead
+                    too_close = true;
+                  }
                 } 
               }
             }
