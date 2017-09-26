@@ -197,7 +197,7 @@ int main() {
   	map_waypoints_dy.push_back(d_y);
   }
 
-  double ref_vel = 49.5;
+  double ref_vel = 0;
   double max_vel = 49.5;
 
   h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy, &ref_vel, &max_vel](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
@@ -240,8 +240,10 @@ int main() {
           	json msgJson;
             
             int prev_size = previous_path_x.size(); 
+            if(prev_size > 20) prev_size = 20;
+            
             double global_yaw, global_x, global_y;
-            const double mile_ph_to_meter_ps = 0.44704; // 1Mph * 1609.344meter/h / 3600 = 0.44704 m/s
+            const double mile_ph_to_meter_ps = 1609.344 / 3600.0; // 1Mph * 1609.344meter/h / 3600 = 0.44704 m/s
             vector<double> ptsx;
           	vector<double> ptsy;
             
@@ -251,6 +253,7 @@ int main() {
               car_s = end_path_s;
             }
 
+            ref_vel = max_vel;
             int lane = car_d / 4;
             for(int i=0; i < sensor_fusion.size(); i++){
               // car is in my lane
@@ -261,11 +264,11 @@ int main() {
                 double check_speed = sqrt(vx*vx + vy*vy);
                 double check_car_s = sensor_fusion[i][5];
                 
-                check_car_s += (double)prev_size * 0.02 * check_speed;
+                check_car_s += (double)previous_path_x.size() * 0.02 * check_speed;
                 
                 if((check_car_s > car_s) && (check_car_s - car_s < 30)){ 
                   // change lane if there is a car in the current lane
-                  if(lane > 0){
+                  /*if(lane > 0){
                     lane--;
                     if(lane < 0){
                       lane = 0;
@@ -275,14 +278,21 @@ int main() {
                     if(lane > 2){
                       lane = 2;
                     }
-                  }
+                  }*/
                   if((check_car_s > car_s) && (check_car_s - car_s < 20)){
-                    // slow down if the car infront is less than 20m ahead
+                    // slow down if the car in front is less than 20m ahead
                     too_close = true;
-                  }
+                    ref_vel = check_speed;
+                  } 
                 } 
               }
             }
+            
+            if(ref_vel > max_vel){
+              ref_vel = max_vel;
+            }
+            
+            cout << "too_close " << too_close << endl;
 
             // check if there are previous way points that can be used 
             if(prev_size < 2){
@@ -372,19 +382,24 @@ int main() {
               step = sqrt(step_x*step_x + step_y*step_y);
             }
             
+            double ref_step = ref_vel * mile_ph_to_meter_ps * 0.02;
+            
             // add new points onto the old way points upto 
             for(int i = 1; i < way_pts_tot - prev_size; i++){
               
               // check if we will potential have a collision and decelerate 
               if(too_close){
                 step -= acceleration; // deceleration -5m/s
-                if(step < 0){
-                  step = 0;
+                if(step < ref_step){
+                  step = ref_step;
                 }
-              } else if(car_speed <= max_vel){
+                //if(step < 0){
+                //  step = 0;
+                //}
+              } else if(car_speed < ref_vel){
                 step += acceleration;
-                if(step > max_step){
-                  step = max_step;
+                if(step > ref_step){
+                  step = ref_step;
                 }
               } 
               
