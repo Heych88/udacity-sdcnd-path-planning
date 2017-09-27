@@ -279,10 +279,16 @@ int main() {
                       lane = 2;
                     }
                   }*/
-                  if((check_car_s > car_s) && (check_car_s - car_s < 20)){
+                  if((check_car_s > car_s) && (check_car_s - car_s < 25)){
                     // slow down if the car in front is less than 20m ahead
                     too_close = true;
-                    ref_vel = check_speed;
+                    if(check_car_s - car_s < 15){
+                      ref_vel = check_speed/2; // slow down to increase the distance between the car in front
+                    } else if(check_car_s - car_s < 10){
+                      ref_vel = 0; // stop as we are too close to the car in front
+                    } else {
+                      ref_vel = check_speed; // slow down to the speed of the vehicle in front and follow it
+                    }
                   } 
                 } 
               }
