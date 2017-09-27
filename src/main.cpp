@@ -198,7 +198,7 @@ int main() {
   }
 
   double ref_vel = 0;
-  double max_vel = 49.5;
+  double max_vel = 49.2;
 
   h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy, &ref_vel, &max_vel](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                      uWS::OpCode opCode) {
@@ -268,7 +268,7 @@ int main() {
                 
                 if((check_car_s > car_s) && (check_car_s - car_s < 30)){ 
                   // change lane if there is a car in the current lane
-                  /*if(lane > 0){
+                  if(lane > 0){
                     lane--;
                     if(lane < 0){
                       lane = 0;
@@ -278,7 +278,7 @@ int main() {
                     if(lane > 2){
                       lane = 2;
                     }
-                  }*/
+                  }
                   if((check_car_s > car_s) && (check_car_s - car_s < 25)){
                     // slow down if the car in front is less than 20m ahead
                     too_close = true;
@@ -370,7 +370,7 @@ int main() {
             // find the number of step points to look the target distance into the future
             // distance(m) = Time_step(s) * desired_vel(Mph) * Mph_to_mps(1609.344/3600 = 0.44704) 
             double N = (target_dist/(0.02*ref_vel*mile_ph_to_meter_ps));
-            double max_step = target_x/N;
+            //double max_step = target_x/N;
             double x_local = 0; // the current x point being considered
             
             double acceleration = 0.003; //9 * 0.02; // max allowed acceleration per step
@@ -388,7 +388,8 @@ int main() {
               step = sqrt(step_x*step_x + step_y*step_y);
             }
             
-            double ref_step = ref_vel * mile_ph_to_meter_ps * 0.02;
+            const double max_step = max_vel * mile_ph_to_meter_ps * 0.02;
+            double ref_step = std::min<double>(ref_vel * mile_ph_to_meter_ps * 0.02, max_step);
             
             // add new points onto the old way points upto 
             for(int i = 1; i < way_pts_tot - prev_size; i++){
