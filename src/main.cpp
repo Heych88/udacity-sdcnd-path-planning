@@ -43,7 +43,7 @@ public:
   vector<double> getFrenet(double x, double y, double theta, const vector<double> &maps_x, const vector<double> &maps_y);
   vector<double> getXY(double s, double d, const vector<double> &maps_s, const vector<double> &maps_x, const vector<double> &maps_y);
   vector<double> startPoints();
-  void getWayPts(vector<double> map_waypoints_s, vector<double> map_waypoints_x, vector<double> map_waypoints_y);
+  void makeSplinePts(vector<double> map_waypoints_s, vector<double> map_waypoints_x, vector<double> map_waypoints_y);
   void getSpline();
   double solveSpline(const double x);
   
@@ -243,7 +243,7 @@ vector<double> Trajectory::startPoints(){
   return {global_x, global_y, global_yaw}; 
 }
 
-void Trajectory::getWayPts(vector<double> map_waypoints_s, vector<double> map_waypoints_x, vector<double> map_waypoints_y) {
+void Trajectory::makeSplinePts(vector<double> map_waypoints_s, vector<double> map_waypoints_x, vector<double> map_waypoints_y) {
   // Frenet coordinates are referenced from the center yellow lines and positive d being on the right.
   double next_d = 2 + 4 * lane; //calculate the cars center d position based on the desired lane
   // get select way points in the future to predict a spline functions for the desired path  
@@ -417,7 +417,7 @@ int main() {
             double global_y = car_tj.global_y;
             double global_yaw = car_tj.global_yaw; //*/
 
-            car_tj.getWayPts(map_waypoints_s, map_waypoints_x, map_waypoints_y);
+            car_tj.makeSplinePts(map_waypoints_s, map_waypoints_x, map_waypoints_y);
             
             //cout << "ptsx[2] " << ptsx[2] << "  ptsy[2] " << ptsy[2] << "  ptsx[3] " << ptsx[3] << "  ptsy[3] " << ptsy[3] << "  ptsx[4] " << ptsx[4] << "  ptsy[4] " << ptsy[4] << endl;
 
@@ -434,12 +434,12 @@ int main() {
             car_tj.getSpline();
             //f_spline.set_points(ptsx, ptsy);
 
-            double target_x = 30.0;
-            double target_y = car_tj.solveSpline(target_x);
-            double target_dist = sqrt(target_x*target_x + target_y*target_y);
+            //double target_x = 30.0;
+            //double target_y = car_tj.solveSpline(target_x);
+            //double target_dist = sqrt(target_x*target_x + target_y*target_y);
             // find the number of step points to look the target distance into the future
             // distance(m) = Time_step(s) * desired_vel(Mph) * Mph_to_mps(1609.344/3600 = 0.44704) 
-            double N = (target_dist/(0.02*ref_vel*mile_ph_to_meter_ps));
+            //double N = (target_dist/(0.02*ref_vel*mile_ph_to_meter_ps));
             //double max_step = target_x/N;
             double x_local = 0; // the current x point being considered
             
