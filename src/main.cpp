@@ -32,7 +32,7 @@ string hasData(string s) {
 
 class Trajectory {
 public:
-  Trajectory(double x_car, double y_car, double yaw_car, double s_car, double drive_lane, vector<double> prev_path_x, vector<double> prev_path_y);
+  Trajectory(const double x_car, const double y_car, const double yaw_car, const double s_car, const double drive_lane, vector<double> prev_path_x, vector<double> prev_path_y, const double speed_car);
   virtual ~Trajectory();
   //constexpr double pi() { return M_PI; }
   double deg2rad(double x);
@@ -42,19 +42,20 @@ public:
   int NextWaypoint(double x, double y, double theta, const vector<double> &maps_x, const vector<double> &maps_y);
   vector<double> getFrenet(double x, double y, double theta, const vector<double> &maps_x, const vector<double> &maps_y);
   vector<double> getXY(double s, double d, const vector<double> &maps_s, const vector<double> &maps_x, const vector<double> &maps_y);
-  vector<double> startPoints();
+  void startPoints();
   void makeSplinePts(vector<double> map_waypoints_s, vector<double> map_waypoints_x, vector<double> map_waypoints_y);
   void getSpline();
   double solveSpline(const double x);
+  void getTrajectoryPts(vector<double> &next_x_vals, vector<double> &next_y_vals, const double ref_vel, const bool too_close);
   
-  double global_x, global_y, global_yaw;
 private:
+  int prev_size;
   tk::spline f_spline;
-  double car_x, car_y, car_yaw, car_s, lane;
+  double car_x, car_y, car_yaw, car_s, lane, car_speed, global_x, global_y, global_yaw;
   vector<double> previous_path_x, previous_path_y, ptsx, ptsy;
 };
 
-Trajectory::Trajectory(double x_car, double y_car, double yaw_car, double s_car, double drive_lane, vector<double> prev_path_x, vector<double> prev_path_y)
+Trajectory::Trajectory(const double x_car, const double y_car, const double yaw_car, const double s_car, const double drive_lane, vector<double> prev_path_x, vector<double> prev_path_y, const double speed_car)
 {
   car_x = x_car;
   car_y = y_car;
@@ -63,6 +64,7 @@ Trajectory::Trajectory(double x_car, double y_car, double yaw_car, double s_car,
   lane = drive_lane;
   previous_path_x = prev_path_x;
   previous_path_y = prev_path_y;
+  car_speed = speed_car;
 }
 
 Trajectory::~Trajectory() {
@@ -198,10 +200,10 @@ vector<double> Trajectory::getXY(double s, double d, const vector<double> &maps_
 
 }
 
-vector<double> Trajectory::startPoints(){
+void Trajectory::startPoints(){
   // check if there are previous way points that can be used 
   //double global_yaw, global_x, global_y; 
-  int prev_size = previous_path_x.size(); 
+  prev_size = previous_path_x.size(); 
   
   if(prev_size < 2){
     global_x = car_x;
@@ -239,8 +241,6 @@ vector<double> Trajectory::startPoints(){
     ptsx.push_back(0);
     ptsy.push_back(0);
   }
-  
-  return {global_x, global_y, global_yaw}; 
 }
 
 void Trajectory::makeSplinePts(vector<double> map_waypoints_s, vector<double> map_waypoints_x, vector<double> map_waypoints_y) {
@@ -268,6 +268,66 @@ double Trajectory::solveSpline(const double x){
   // create a function that intersects all points on the desired path
   
   return f_spline(x);
+}
+
+void Trajectory::getTrajectoryPts(vector<double> &next_x_vals, vector<double> &next_y_vals, const double ref_vel, const bool too_close) {
+  
+  double max_vel = 49.5;
+  double x_local = 0; // the current x point being considered
+  double acceleration = 0.003; //9 * 0.02; // max allowed acceleration per step
+  int way_pts_tot = 50; // how many way points are to be predicted into the future 
+  
+  // Store the unused old way points to create a smooth path transition
+  for(int i=0; i < prev_size; i++){
+    next_x_vals.push_back(previous_path_x[i]);
+    next_y_vals.push_back(previous_path_y[i]);
+  }
+
+  double step;
+  int next_size = next_x_vals.size();
+  // get the previous step between the last two previous trajectory points and set
+  // that as the step size to prevent excess acceleration and jerk 
+  if(next_size < 2){
+    step = 0;
+  } else {
+    double step_x = next_x_vals[next_size - 1] - next_x_vals[next_size - 2];
+    double step_y = next_y_vals[next_size - 1] - next_y_vals[next_size - 2];
+    step = sqrt(step_x*step_x + step_y*step_y);
+  }
+
+  const double mile_ph_to_meter_ps = 1609.344 / 3600.0; // 1Mph * 1609.344meter/h / 3600 = 0.44704 m/s
+  const double max_step = max_vel * mile_ph_to_meter_ps * 0.02;
+  double ref_step = std::min<double>(ref_vel * mile_ph_to_meter_ps * 0.02, max_step);
+
+  // add new points onto the old way points upto 
+  for(int i = 1; i < way_pts_tot - prev_size; i++){
+
+    // check if we will potential have a collision and decelerate 
+    if(too_close){
+      step -= acceleration; // deceleration -5m/s
+      if(step < ref_step){
+        step = ref_step;
+      }
+      //if(step < 0){
+      //  step = 0;
+      //}
+    } else if(car_speed < ref_vel){
+      step += acceleration;
+      if(step > ref_step){
+        step = ref_step;
+      }
+    } 
+
+    x_local += step;
+    double y_local = Trajectory::solveSpline(x_local);
+
+    // convert the reference point from local car centric coordinates to global coordinates
+    double x_point = x_local * cos(global_yaw) - y_local * sin(global_yaw);
+    double y_point = x_local * sin(global_yaw) + y_local * cos(global_yaw);
+
+    next_x_vals.push_back(x_point + global_x);
+    next_y_vals.push_back(y_point + global_y);
+  }
 }
             
 
@@ -353,10 +413,6 @@ int main() {
             int prev_size = previous_path_x.size(); 
             //if(prev_size > 20) prev_size = 20;
             
-            //double global_yaw, global_x, global_y;
-            const double mile_ph_to_meter_ps = 1609.344 / 3600.0; // 1Mph * 1609.344meter/h / 3600 = 0.44704 m/s
-            
-            
             bool too_close = false;
             
             if(prev_size >0){
@@ -410,86 +466,20 @@ int main() {
             
             cout << "too_close " << too_close << endl;
 
-            Trajectory car_tj(car_x, car_y, car_yaw, car_s, lane, previous_path_x, previous_path_y);
-            vector<double> g_pts = car_tj.startPoints();
-            
-            double global_x = car_tj.global_x;
-            double global_y = car_tj.global_y;
-            double global_yaw = car_tj.global_yaw; //*/
+            Trajectory car_tj(car_x, car_y, car_yaw, car_s, lane, previous_path_x, previous_path_y, car_speed);
+            car_tj.startPoints();
 
             car_tj.makeSplinePts(map_waypoints_s, map_waypoints_x, map_waypoints_y);
-            
-            //cout << "ptsx[2] " << ptsx[2] << "  ptsy[2] " << ptsy[2] << "  ptsx[3] " << ptsx[3] << "  ptsy[3] " << ptsy[3] << "  ptsx[4] " << ptsx[4] << "  ptsy[4] " << ptsy[4] << endl;
-
+ 
           	vector<double> next_x_vals;
           	vector<double> next_y_vals;
-            // Store the unused old way points to create a smooth path transition
-            for(int i=0; i < prev_size; i++){
-              next_x_vals.push_back(previous_path_x[i]);
-              next_y_vals.push_back(previous_path_y[i]);
-            }
-
+ 
             // create a function that intersects all points on the desired path
             //tk::spline f_spline;
             car_tj.getSpline();
             //f_spline.set_points(ptsx, ptsy);
 
-            //double target_x = 30.0;
-            //double target_y = car_tj.solveSpline(target_x);
-            //double target_dist = sqrt(target_x*target_x + target_y*target_y);
-            // find the number of step points to look the target distance into the future
-            // distance(m) = Time_step(s) * desired_vel(Mph) * Mph_to_mps(1609.344/3600 = 0.44704) 
-            //double N = (target_dist/(0.02*ref_vel*mile_ph_to_meter_ps));
-            //double max_step = target_x/N;
-            double x_local = 0; // the current x point being considered
-            
-            double acceleration = 0.003; //9 * 0.02; // max allowed acceleration per step
-            int way_pts_tot = 50; // how many way points are to be predicted into the future 
-            
-            double step;
-            int next_size = next_x_vals.size();
-            // get the previous step between the last two previous trajectory points and set
-            // that as the step size to prevent excess acceleration and jerk 
-            if(next_size < 2){
-              step = 0;
-            } else {
-              double step_x = next_x_vals[next_size - 1] - next_x_vals[next_size - 2];
-              double step_y = next_y_vals[next_size - 1] - next_y_vals[next_size - 2];
-              step = sqrt(step_x*step_x + step_y*step_y);
-            }
-            
-            const double max_step = max_vel * mile_ph_to_meter_ps * 0.02;
-            double ref_step = std::min<double>(ref_vel * mile_ph_to_meter_ps * 0.02, max_step);
-            
-            // add new points onto the old way points upto 
-            for(int i = 1; i < way_pts_tot - prev_size; i++){
-              
-              // check if we will potential have a collision and decelerate 
-              if(too_close){
-                step -= acceleration; // deceleration -5m/s
-                if(step < ref_step){
-                  step = ref_step;
-                }
-                //if(step < 0){
-                //  step = 0;
-                //}
-              } else if(car_speed < ref_vel){
-                step += acceleration;
-                if(step > ref_step){
-                  step = ref_step;
-                }
-              } 
-              
-              x_local += step;
-              double y_local = car_tj.solveSpline(x_local);
-              
-              // convert the reference point from local car centric coordinates to global coordinates
-              double x_point = x_local * cos(global_yaw) - y_local * sin(global_yaw);
-              double y_point = x_local * sin(global_yaw) + y_local * cos(global_yaw);
-              
-              next_x_vals.push_back(x_point + global_x);
-              next_y_vals.push_back(y_point + global_y);
-            }
+            car_tj.getTrajectoryPts(next_x_vals, next_y_vals, ref_vel, too_close);
             
           	// TODO: define a path made up of (x,y) points that the car will visit sequentially every .02 seconds
           	msgJson["next_x"] = next_x_vals;
