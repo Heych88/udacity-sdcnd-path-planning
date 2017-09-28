@@ -42,13 +42,16 @@ public:
   int NextWaypoint(double x, double y, double theta, const vector<double> &maps_x, const vector<double> &maps_y);
   vector<double> getFrenet(double x, double y, double theta, const vector<double> &maps_x, const vector<double> &maps_y);
   vector<double> getXY(double s, double d, const vector<double> &maps_s, const vector<double> &maps_x, const vector<double> &maps_y);
-  vector<double> startPoints(vector<double> &ptsx, vector<double> &ptsy);
-  void getWayPts(vector<double> &ptsx, vector<double> &ptsy, vector<double> map_waypoints_s, vector<double> map_waypoints_x, vector<double> map_waypoints_y);
+  vector<double> startPoints();
+  void getWayPts(vector<double> map_waypoints_s, vector<double> map_waypoints_x, vector<double> map_waypoints_y);
+  void getSpline();
+  double solveSpline(const double x);
   
   double global_x, global_y, global_yaw;
 private:
+  tk::spline f_spline;
   double car_x, car_y, car_yaw, car_s, lane;
-  vector<double> previous_path_x, previous_path_y;
+  vector<double> previous_path_x, previous_path_y, ptsx, ptsy;
 };
 
 Trajectory::Trajectory(double x_car, double y_car, double yaw_car, double s_car, double drive_lane, vector<double> prev_path_x, vector<double> prev_path_y)
@@ -195,7 +198,7 @@ vector<double> Trajectory::getXY(double s, double d, const vector<double> &maps_
 
 }
 
-vector<double> Trajectory::startPoints(vector<double> &ptsx, vector<double> &ptsy){
+vector<double> Trajectory::startPoints(){
   // check if there are previous way points that can be used 
   //double global_yaw, global_x, global_y; 
   int prev_size = previous_path_x.size(); 
@@ -240,7 +243,7 @@ vector<double> Trajectory::startPoints(vector<double> &ptsx, vector<double> &pts
   return {global_x, global_y, global_yaw}; 
 }
 
-void Trajectory::getWayPts(vector<double> &ptsx, vector<double> &ptsy, vector<double> map_waypoints_s, vector<double> map_waypoints_x, vector<double> map_waypoints_y) {
+void Trajectory::getWayPts(vector<double> map_waypoints_s, vector<double> map_waypoints_x, vector<double> map_waypoints_y) {
   // Frenet coordinates are referenced from the center yellow lines and positive d being on the right.
   double next_d = 2 + 4 * lane; //calculate the cars center d position based on the desired lane
   // get select way points in the future to predict a spline functions for the desired path  
@@ -254,6 +257,17 @@ void Trajectory::getWayPts(vector<double> &ptsx, vector<double> &ptsy, vector<do
     ptsx.push_back(shift_x*cos(0-global_yaw) - shift_y*sin(0-global_yaw));
     ptsy.push_back(shift_x*sin(0-global_yaw) + shift_y*cos(0-global_yaw));
   }
+}
+
+void Trajectory::getSpline(){
+  // create a function that intersects all points on the desired path
+  f_spline.set_points(ptsx, ptsy);
+}
+
+double Trajectory::solveSpline(const double x){
+  // create a function that intersects all points on the desired path
+  
+  return f_spline(x);
 }
             
 
@@ -341,8 +355,7 @@ int main() {
             
             //double global_yaw, global_x, global_y;
             const double mile_ph_to_meter_ps = 1609.344 / 3600.0; // 1Mph * 1609.344meter/h / 3600 = 0.44704 m/s
-            vector<double> ptsx;
-          	vector<double> ptsy;
+            
             
             bool too_close = false;
             
@@ -397,72 +410,16 @@ int main() {
             
             cout << "too_close " << too_close << endl;
 
-            /*// check if there are previous way points that can be used 
-            if(prev_size < 2){
-              global_x = car_x;
-              global_y = car_y;
-              global_yaw = deg2rad(car_yaw);
-              
-              // store the cars previous coordinates and transform them into the cars reference frame
-              double shift_x = (global_x - cos(global_yaw)) - global_x;
-              double shift_y = (global_y - sin(global_yaw)) - global_y;
-              
-              ptsx.push_back(shift_x*cos(0-global_yaw) - shift_y*sin(0-global_yaw));
-              ptsy.push_back(shift_x*sin(0-global_yaw) + shift_y*cos(0-global_yaw));
-
-              // store the cars current coordinates and transform them into the cars reference frame
-              // since the current car coordinates are the origin store (0,0) 
-              ptsx.push_back(0);
-              ptsy.push_back(0);
-            } else {
-              global_x = previous_path_x[prev_size - 1];
-              global_y = previous_path_y[prev_size - 1];
-              double global_x_prev = previous_path_x[prev_size - 2];
-              double global_y_prev = previous_path_y[prev_size - 2];
-              
-              global_yaw = atan2(global_y - global_y_prev, global_x - global_x_prev);
-              
-              // store the cars previous coordinates and transform them into the cars reference frame
-              double shift_x = global_x_prev - global_x;
-              double shift_y = global_y_prev - global_y;
-              
-              ptsx.push_back(shift_x*cos(0-global_yaw) - shift_y*sin(0-global_yaw));
-              ptsy.push_back(shift_x*sin(0-global_yaw) + shift_y*cos(0-global_yaw));
-
-              // store the cars current coordinates and transform them into the cars reference frame
-              // since the current car coordinates are the origin store (0,0) 
-              ptsx.push_back(0);
-              ptsy.push_back(0);
-            }//*/
-            
             Trajectory car_tj(car_x, car_y, car_yaw, car_s, lane, previous_path_x, previous_path_y);
-            vector<double> g_pts = car_tj.startPoints(ptsx, ptsy);
+            vector<double> g_pts = car_tj.startPoints();
             
             double global_x = car_tj.global_x;
             double global_y = car_tj.global_y;
             double global_yaw = car_tj.global_yaw; //*/
-            
-            //cout << "ptsx[0] " << ptsx[0] << "  ptsy[0] " << ptsy[0] << "  ptsx[1] " << ptsx[1] << "  ptsy[1] " << ptsy[1] << endl;
-            
-            //cout << "global_x " << global_x << "  global_y " << global_y << "  global_yaw " << global_yaw << endl;
 
-            // Frenet coordinates are referenced from the center yellow lines and positive d being on the right.
-            /*double next_d = 2 + 4 * lane; //calculate the cars center d position based on the desired lane
-            // get select way points in the future to predict a spline functions for the desired path  
-            for(int i=1; i <= 3; i++){
-              vector<double> xy_pts = getXY(car_s+(i*30), next_d, map_waypoints_s, map_waypoints_x, map_waypoints_y);
-              
-              // convert these future points into car centric coordinates
-              double shift_x = xy_pts[0] - global_x;
-              double shift_y = xy_pts[1] - global_y;
+            car_tj.getWayPts(map_waypoints_s, map_waypoints_x, map_waypoints_y);
             
-              ptsx.push_back(shift_x*cos(0-global_yaw) - shift_y*sin(0-global_yaw));
-              ptsy.push_back(shift_x*sin(0-global_yaw) + shift_y*cos(0-global_yaw));
-            }//*/
-            
-            car_tj.getWayPts(ptsx, ptsy, map_waypoints_s, map_waypoints_x, map_waypoints_y);
-            
-            cout << "ptsx[2] " << ptsx[2] << "  ptsy[2] " << ptsy[2] << "  ptsx[3] " << ptsx[3] << "  ptsy[3] " << ptsy[3] << "  ptsx[4] " << ptsx[4] << "  ptsy[4] " << ptsy[4] << endl;
+            //cout << "ptsx[2] " << ptsx[2] << "  ptsy[2] " << ptsy[2] << "  ptsx[3] " << ptsx[3] << "  ptsy[3] " << ptsy[3] << "  ptsx[4] " << ptsx[4] << "  ptsy[4] " << ptsy[4] << endl;
 
           	vector<double> next_x_vals;
           	vector<double> next_y_vals;
@@ -473,11 +430,12 @@ int main() {
             }
 
             // create a function that intersects all points on the desired path
-            tk::spline f_spline;
-            f_spline.set_points(ptsx, ptsy);
+            //tk::spline f_spline;
+            car_tj.getSpline();
+            //f_spline.set_points(ptsx, ptsy);
 
             double target_x = 30.0;
-            double target_y = f_spline(target_x);
+            double target_y = car_tj.solveSpline(target_x);
             double target_dist = sqrt(target_x*target_x + target_y*target_y);
             // find the number of step points to look the target distance into the future
             // distance(m) = Time_step(s) * desired_vel(Mph) * Mph_to_mps(1609.344/3600 = 0.44704) 
@@ -523,7 +481,7 @@ int main() {
               } 
               
               x_local += step;
-              double y_local = f_spline(x_local);
+              double y_local = car_tj.solveSpline(x_local);
               
               // convert the reference point from local car centric coordinates to global coordinates
               double x_point = x_local * cos(global_yaw) - y_local * sin(global_yaw);
