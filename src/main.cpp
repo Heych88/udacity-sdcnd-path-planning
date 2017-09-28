@@ -15,11 +15,6 @@ using namespace std;
 // for convenience
 using json = nlohmann::json;
 
-// For converting back and forth between radians and degrees.
-constexpr double pi() { return M_PI; }
-double deg2rad(double x) { return x * pi() / 180; }
-double rad2deg(double x) { return x * 180 / pi(); }
-
 // Checks if the SocketIO event has JSON data.
 // If there is data the JSON object in string format will be returned,
 // else the empty string "" will be returned.
@@ -35,11 +30,51 @@ string hasData(string s) {
   return "";
 }
 
-double distance(double x1, double y1, double x2, double y2)
+class Trajectory {
+public:
+  Trajectory(double x_car, double y_car, double yaw_car, double s_car, double drive_lane, vector<double> prev_path_x, vector<double> prev_path_y);
+  virtual ~Trajectory();
+  //constexpr double pi() { return M_PI; }
+  double deg2rad(double x);
+  double rad2deg(double x);
+  double distance(double x1, double y1, double x2, double y2);
+  int ClosestWaypoint(double x, double y, const vector<double> &maps_x, const vector<double> &maps_y);
+  int NextWaypoint(double x, double y, double theta, const vector<double> &maps_x, const vector<double> &maps_y);
+  vector<double> getFrenet(double x, double y, double theta, const vector<double> &maps_x, const vector<double> &maps_y);
+  vector<double> getXY(double s, double d, const vector<double> &maps_s, const vector<double> &maps_x, const vector<double> &maps_y);
+  vector<double> startPoints(vector<double> &ptsx, vector<double> &ptsy);
+  void getWayPts(vector<double> &ptsx, vector<double> &ptsy, vector<double> map_waypoints_s, vector<double> map_waypoints_x, vector<double> map_waypoints_y);
+  
+  double global_x, global_y, global_yaw;
+private:
+  double car_x, car_y, car_yaw, car_s, lane;
+  vector<double> previous_path_x, previous_path_y;
+};
+
+Trajectory::Trajectory(double x_car, double y_car, double yaw_car, double s_car, double drive_lane, vector<double> prev_path_x, vector<double> prev_path_y)
+{
+  car_x = x_car;
+  car_y = y_car;
+  car_yaw = yaw_car;
+  car_s = s_car;
+  lane = drive_lane;
+  previous_path_x = prev_path_x;
+  previous_path_y = prev_path_y;
+}
+
+Trajectory::~Trajectory() {
+}
+
+// For converting back and forth between radians and degrees.
+
+double Trajectory::deg2rad(double x) { return x * M_PI / 180; }
+double Trajectory::rad2deg(double x) { return x * 180 / M_PI; }
+
+double Trajectory::distance(double x1, double y1, double x2, double y2)
 {
 	return sqrt((x2-x1)*(x2-x1)+(y2-y1)*(y2-y1));
 }
-int ClosestWaypoint(double x, double y, const vector<double> &maps_x, const vector<double> &maps_y)
+int Trajectory::ClosestWaypoint(double x, double y, const vector<double> &maps_x, const vector<double> &maps_y)
 {
 
 	double closestLen = 100000; //large number
@@ -49,7 +84,7 @@ int ClosestWaypoint(double x, double y, const vector<double> &maps_x, const vect
 	{
 		double map_x = maps_x[i];
 		double map_y = maps_y[i];
-		double dist = distance(x,y,map_x,map_y);
+		double dist = Trajectory::distance(x,y,map_x,map_y);
 		if(dist < closestLen)
 		{
 			closestLen = dist;
@@ -62,10 +97,10 @@ int ClosestWaypoint(double x, double y, const vector<double> &maps_x, const vect
 
 }
 
-int NextWaypoint(double x, double y, double theta, const vector<double> &maps_x, const vector<double> &maps_y)
+int Trajectory::NextWaypoint(double x, double y, double theta, const vector<double> &maps_x, const vector<double> &maps_y)
 {
 
-	int closestWaypoint = ClosestWaypoint(x,y,maps_x,maps_y);
+	int closestWaypoint = Trajectory::ClosestWaypoint(x,y,maps_x,maps_y);
 
 	double map_x = maps_x[closestWaypoint];
 	double map_y = maps_y[closestWaypoint];
@@ -74,7 +109,7 @@ int NextWaypoint(double x, double y, double theta, const vector<double> &maps_x,
 
 	double angle = abs(theta-heading);
 
-	if(angle > pi()/4)
+	if(angle > M_PI/4)
 	{
 		closestWaypoint++;
 	}
@@ -84,9 +119,9 @@ int NextWaypoint(double x, double y, double theta, const vector<double> &maps_x,
 }
 
 // Transform from Cartesian x,y coordinates to Frenet s,d coordinates
-vector<double> getFrenet(double x, double y, double theta, const vector<double> &maps_x, const vector<double> &maps_y)
+vector<double> Trajectory::getFrenet(double x, double y, double theta, const vector<double> &maps_x, const vector<double> &maps_y)
 {
-	int next_wp = NextWaypoint(x,y, theta, maps_x,maps_y);
+	int next_wp = Trajectory::NextWaypoint(x,y, theta, maps_x,maps_y);
 
 	int prev_wp;
 	prev_wp = next_wp-1;
@@ -105,14 +140,14 @@ vector<double> getFrenet(double x, double y, double theta, const vector<double> 
 	double proj_x = proj_norm*n_x;
 	double proj_y = proj_norm*n_y;
 
-	double frenet_d = distance(x_x,x_y,proj_x,proj_y);
+	double frenet_d = Trajectory::distance(x_x,x_y,proj_x,proj_y);
 
 	//see if d value is positive or negative by comparing it to a center point
 
 	double center_x = 1000-maps_x[prev_wp];
 	double center_y = 2000-maps_y[prev_wp];
-	double centerToPos = distance(center_x,center_y,x_x,x_y);
-	double centerToRef = distance(center_x,center_y,proj_x,proj_y);
+	double centerToPos = Trajectory::distance(center_x,center_y,x_x,x_y);
+	double centerToRef = Trajectory::distance(center_x,center_y,proj_x,proj_y);
 
 	if(centerToPos <= centerToRef)
 	{
@@ -123,17 +158,17 @@ vector<double> getFrenet(double x, double y, double theta, const vector<double> 
 	double frenet_s = 0;
 	for(int i = 0; i < prev_wp; i++)
 	{
-		frenet_s += distance(maps_x[i],maps_y[i],maps_x[i+1],maps_y[i+1]);
+		frenet_s += Trajectory::distance(maps_x[i],maps_y[i],maps_x[i+1],maps_y[i+1]);
 	}
 
-	frenet_s += distance(0,0,proj_x,proj_y);
+	frenet_s += Trajectory::distance(0,0,proj_x,proj_y);
 
 	return {frenet_s,frenet_d};
 
 }
 
 // Transform from Frenet s,d coordinates to Cartesian x,y
-vector<double> getXY(double s, double d, const vector<double> &maps_s, const vector<double> &maps_x, const vector<double> &maps_y)
+vector<double> Trajectory::getXY(double s, double d, const vector<double> &maps_s, const vector<double> &maps_x, const vector<double> &maps_y)
 {
 	int prev_wp = -1;
 
@@ -151,7 +186,7 @@ vector<double> getXY(double s, double d, const vector<double> &maps_s, const vec
 	double seg_x = maps_x[prev_wp]+seg_s*cos(heading);
 	double seg_y = maps_y[prev_wp]+seg_s*sin(heading);
 
-	double perp_heading = heading-pi()/2;
+	double perp_heading = heading-M_PI/2;
 
 	double x = seg_x + d*cos(perp_heading);
 	double y = seg_y + d*sin(perp_heading);
@@ -160,15 +195,15 @@ vector<double> getXY(double s, double d, const vector<double> &maps_s, const vec
 
 }
 
-vector<double> startPoints(double car_x, double car_y, double car_yaw, vector<double> previous_path_x, vector<double> previous_path_y, vector<double> &ptsx, vector<double> &ptsy){
+vector<double> Trajectory::startPoints(vector<double> &ptsx, vector<double> &ptsy){
   // check if there are previous way points that can be used 
-  double global_yaw, global_x, global_y; 
+  //double global_yaw, global_x, global_y; 
   int prev_size = previous_path_x.size(); 
   
   if(prev_size < 2){
     global_x = car_x;
     global_y = car_y;
-    global_yaw = deg2rad(car_yaw);
+    global_yaw = Trajectory::deg2rad(car_yaw);
 
     // store the cars previous coordinates and transform them into the cars reference frame
     double shift_x = (global_x - cos(global_yaw)) - global_x;
@@ -205,12 +240,12 @@ vector<double> startPoints(double car_x, double car_y, double car_yaw, vector<do
   return {global_x, global_y, global_yaw}; 
 }
 
-void getWayPts(double global_x, double global_y, double global_yaw, double car_s, double lane, vector<double> &ptsx, vector<double> &ptsy, vector<double> map_waypoints_s, vector<double> map_waypoints_x, vector<double> map_waypoints_y) {
+void Trajectory::getWayPts(vector<double> &ptsx, vector<double> &ptsy, vector<double> map_waypoints_s, vector<double> map_waypoints_x, vector<double> map_waypoints_y) {
   // Frenet coordinates are referenced from the center yellow lines and positive d being on the right.
   double next_d = 2 + 4 * lane; //calculate the cars center d position based on the desired lane
   // get select way points in the future to predict a spline functions for the desired path  
   for(int i=1; i <= 3; i++){
-    vector<double> xy_pts = getXY(car_s+(i*30), next_d, map_waypoints_s, map_waypoints_x, map_waypoints_y);
+    vector<double> xy_pts = Trajectory::getXY(car_s+(i*30), next_d, map_waypoints_s, map_waypoints_x, map_waypoints_y);
 
     // convert these future points into car centric coordinates
     double shift_x = xy_pts[0] - global_x;
@@ -304,7 +339,7 @@ int main() {
             int prev_size = previous_path_x.size(); 
             //if(prev_size > 20) prev_size = 20;
             
-            double global_yaw, global_x, global_y;
+            //double global_yaw, global_x, global_y;
             const double mile_ph_to_meter_ps = 1609.344 / 3600.0; // 1Mph * 1609.344meter/h / 3600 = 0.44704 m/s
             vector<double> ptsx;
           	vector<double> ptsy;
@@ -400,11 +435,12 @@ int main() {
               ptsy.push_back(0);
             }//*/
             
-            vector<double> g_pts = startPoints(car_x, car_y, car_yaw, previous_path_x, previous_path_y, ptsx, ptsy);
+            Trajectory car_tj(car_x, car_y, car_yaw, car_s, lane, previous_path_x, previous_path_y);
+            vector<double> g_pts = car_tj.startPoints(ptsx, ptsy);
             
-            global_x = g_pts[0];
-            global_y = g_pts[1];
-            global_yaw = g_pts[2]; //*/
+            double global_x = car_tj.global_x;
+            double global_y = car_tj.global_y;
+            double global_yaw = car_tj.global_yaw; //*/
             
             //cout << "ptsx[0] " << ptsx[0] << "  ptsy[0] " << ptsy[0] << "  ptsx[1] " << ptsx[1] << "  ptsy[1] " << ptsy[1] << endl;
             
@@ -424,7 +460,7 @@ int main() {
               ptsy.push_back(shift_x*sin(0-global_yaw) + shift_y*cos(0-global_yaw));
             }//*/
             
-            getWayPts(global_x, global_y, global_yaw, car_s, lane, ptsx, ptsy, map_waypoints_s, map_waypoints_x, map_waypoints_y);
+            car_tj.getWayPts(ptsx, ptsy, map_waypoints_s, map_waypoints_x, map_waypoints_y);
             
             cout << "ptsx[2] " << ptsx[2] << "  ptsy[2] " << ptsy[2] << "  ptsx[3] " << ptsx[3] << "  ptsy[3] " << ptsy[3] << "  ptsx[4] " << ptsx[4] << "  ptsy[4] " << ptsy[4] << endl;
 
