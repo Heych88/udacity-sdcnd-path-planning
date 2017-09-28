@@ -160,6 +160,68 @@ vector<double> getXY(double s, double d, const vector<double> &maps_s, const vec
 
 }
 
+vector<double> startPoints(double car_x, double car_y, double car_yaw, vector<double> previous_path_x, vector<double> previous_path_y, vector<double> &ptsx, vector<double> &ptsy){
+  // check if there are previous way points that can be used 
+  double global_yaw, global_x, global_y; 
+  int prev_size = previous_path_x.size(); 
+  
+  if(prev_size < 2){
+    global_x = car_x;
+    global_y = car_y;
+    global_yaw = deg2rad(car_yaw);
+
+    // store the cars previous coordinates and transform them into the cars reference frame
+    double shift_x = (global_x - cos(global_yaw)) - global_x;
+    double shift_y = (global_y - sin(global_yaw)) - global_y;
+
+    ptsx.push_back(shift_x*cos(0-global_yaw) - shift_y*sin(0-global_yaw));
+    ptsy.push_back(shift_x*sin(0-global_yaw) + shift_y*cos(0-global_yaw));
+
+    // store the cars current coordinates and transform them into the cars reference frame
+    // since the current car coordinates are the origin store (0,0) 
+    ptsx.push_back(0);
+    ptsy.push_back(0);
+  } else {
+    global_x = previous_path_x[prev_size - 1];
+    global_y = previous_path_y[prev_size - 1];
+    double global_x_prev = previous_path_x[prev_size - 2];
+    double global_y_prev = previous_path_y[prev_size - 2];
+
+    global_yaw = atan2(global_y - global_y_prev, global_x - global_x_prev);
+
+    // store the cars previous coordinates and transform them into the cars reference frame
+    double shift_x = global_x_prev - global_x;
+    double shift_y = global_y_prev - global_y;
+
+    ptsx.push_back(shift_x*cos(0-global_yaw) - shift_y*sin(0-global_yaw));
+    ptsy.push_back(shift_x*sin(0-global_yaw) + shift_y*cos(0-global_yaw));
+
+    // store the cars current coordinates and transform them into the cars reference frame
+    // since the current car coordinates are the origin store (0,0) 
+    ptsx.push_back(0);
+    ptsy.push_back(0);
+  }
+  
+  return {global_x, global_y, global_yaw}; 
+}
+
+void getWayPts(double global_x, double global_y, double global_yaw, double car_s, double lane, vector<double> &ptsx, vector<double> &ptsy, vector<double> map_waypoints_s, vector<double> map_waypoints_x, vector<double> map_waypoints_y) {
+  // Frenet coordinates are referenced from the center yellow lines and positive d being on the right.
+  double next_d = 2 + 4 * lane; //calculate the cars center d position based on the desired lane
+  // get select way points in the future to predict a spline functions for the desired path  
+  for(int i=1; i <= 3; i++){
+    vector<double> xy_pts = getXY(car_s+(i*30), next_d, map_waypoints_s, map_waypoints_x, map_waypoints_y);
+
+    // convert these future points into car centric coordinates
+    double shift_x = xy_pts[0] - global_x;
+    double shift_y = xy_pts[1] - global_y;
+
+    ptsx.push_back(shift_x*cos(0-global_yaw) - shift_y*sin(0-global_yaw));
+    ptsy.push_back(shift_x*sin(0-global_yaw) + shift_y*cos(0-global_yaw));
+  }
+}
+            
+
 int main() {
   uWS::Hub h;
 
@@ -240,7 +302,7 @@ int main() {
           	json msgJson;
             
             int prev_size = previous_path_x.size(); 
-            if(prev_size > 20) prev_size = 20;
+            //if(prev_size > 20) prev_size = 20;
             
             double global_yaw, global_x, global_y;
             const double mile_ph_to_meter_ps = 1609.344 / 3600.0; // 1Mph * 1609.344meter/h / 3600 = 0.44704 m/s
@@ -300,7 +362,7 @@ int main() {
             
             cout << "too_close " << too_close << endl;
 
-            // check if there are previous way points that can be used 
+            /*// check if there are previous way points that can be used 
             if(prev_size < 2){
               global_x = car_x;
               global_y = car_y;
@@ -336,10 +398,20 @@ int main() {
               // since the current car coordinates are the origin store (0,0) 
               ptsx.push_back(0);
               ptsy.push_back(0);
-            }
+            }//*/
+            
+            vector<double> g_pts = startPoints(car_x, car_y, car_yaw, previous_path_x, previous_path_y, ptsx, ptsy);
+            
+            global_x = g_pts[0];
+            global_y = g_pts[1];
+            global_yaw = g_pts[2]; //*/
+            
+            //cout << "ptsx[0] " << ptsx[0] << "  ptsy[0] " << ptsy[0] << "  ptsx[1] " << ptsx[1] << "  ptsy[1] " << ptsy[1] << endl;
+            
+            //cout << "global_x " << global_x << "  global_y " << global_y << "  global_yaw " << global_yaw << endl;
 
             // Frenet coordinates are referenced from the center yellow lines and positive d being on the right.
-            double next_d = 2 + 4 * lane; //calculate the cars center d position based on the desired lane
+            /*double next_d = 2 + 4 * lane; //calculate the cars center d position based on the desired lane
             // get select way points in the future to predict a spline functions for the desired path  
             for(int i=1; i <= 3; i++){
               vector<double> xy_pts = getXY(car_s+(i*30), next_d, map_waypoints_s, map_waypoints_x, map_waypoints_y);
@@ -350,7 +422,11 @@ int main() {
             
               ptsx.push_back(shift_x*cos(0-global_yaw) - shift_y*sin(0-global_yaw));
               ptsy.push_back(shift_x*sin(0-global_yaw) + shift_y*cos(0-global_yaw));
-            }
+            }//*/
+            
+            getWayPts(global_x, global_y, global_yaw, car_s, lane, ptsx, ptsy, map_waypoints_s, map_waypoints_x, map_waypoints_y);
+            
+            cout << "ptsx[2] " << ptsx[2] << "  ptsy[2] " << ptsy[2] << "  ptsx[3] " << ptsx[3] << "  ptsy[3] " << ptsy[3] << "  ptsx[4] " << ptsx[4] << "  ptsy[4] " << ptsy[4] << endl;
 
           	vector<double> next_x_vals;
           	vector<double> next_y_vals;
