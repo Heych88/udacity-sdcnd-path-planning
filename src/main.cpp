@@ -367,22 +367,23 @@ void Trajectory::getTrajectoryPts(vector<double> &next_x_vals, vector<double> &n
 
 class NextAction {
 public:
-  NextAction(const double s_car, const double d_car, const double speed_car, const int path_size);
+  NextAction(const double s_car, const double d_car, const double speed_car, const int path_size, const double max_speed);
   virtual ~NextAction();
   int getAction(const vector<vector<double>> &sensor_fusion, double &ref_vel, bool &too_close, int &state);
-  
+  void prepLaneChangeState();
 private:
-  double car_s, car_d, car_speed;
+  double car_s, car_d, car_speed, max_vel;
   int lane, lane_left, lane_right, prev_size, next_state;
   bool is_gap_left, is_gap_right, change_lane, is_new_state;//, too_close;
 };
   
-NextAction::NextAction(const double s_car, const double d_car, const double speed_car, const int path_size)
+NextAction::NextAction(const double s_car, const double d_car, const double speed_car, const int path_size, const double max_speed)
 {
   car_s = s_car;
   car_d = d_car;
   car_speed = speed_car;
   is_new_state = false;
+  max_vel = max_speed;
   
   prev_size = path_size;
   
@@ -431,66 +432,87 @@ int NextAction::getAction(const vector<vector<double>> &sensor_fusion, double &r
 
     // only look at objects 15m behind and 40m in front that are in the 
     // lane to the left, right and same lane as travel
-    if((check_car_s > car_s-15) && (check_car_s - car_s < 40) && d < (2+4*lane_right+1.8) && d > (2+4*lane_left-1.8)){
+    //if((check_car_s > car_s-15) && (check_car_s - car_s < 40) && d < (2+4*lane_right+1.8) && d > (2+4*lane_left-1.8)){
 
-      switch(state){
-        case(LANE_CLEAR):
-          // Check if there is a vehicle in front and in same lane 
-          if((d < (2+4*lane+1.8)) && (d > (2+4*lane-1.8)) && (check_car_s > car_s)){                
-            // only change the next state if we haven't changed it already
-            if(!is_new_state){
-              next_state = PREP_CHANGE_LANE;
-              is_new_state = true;
-            }
+    switch(state){
+      case(LANE_CLEAR):
+        // Check if there is a vehicle in front and in same lane 
+        if((d < (2+4*lane+1.8)) && (d > (2+4*lane-1.8)) && (check_car_s > car_s) && (check_car_s - car_s < 40)){                
+          // only change the next state if we haven't changed it already
+          if(!is_new_state){
+            next_state = PREP_CHANGE_LANE;
+            is_new_state = true;
           }
-          break;
-        case(PREP_CHANGE_LANE):
-          
-          /*// Vehicles in the left lane
-          if((lane > lane_left) && d < (2+4*lane_left+2) && d > (2+4*lane_left-2)){                
+        } else {
+          ref_vel = max_vel;
+        }
+        cout << "LANE_CLEAR" << endl;
+        break;
+      case(PREP_CHANGE_LANE):
 
-            // check if there is a merge gap
-            if((check_car_s > car_s-10) && (check_car_s - car_s < 30)){
-              is_gap_left = false;
-            } 
+        if((check_car_s > car_s) && (check_car_s - car_s < 25)){
+          // only change the next state if a lane change has not yet to been set
+          if(next_state == PREP_CHANGE_LANE){
+            next_state = FOLLOW;
           }
+        } 
 
-          // Vehicles in the right lane
-          if((lane < lane_right) && d < (2+4*lane_right+2) && d > (2+4*lane_right-2)){                
-            double vx = sensor_fusion[i][3];
-            double vy = sensor_fusion[i][4];
-            double check_speed = sqrt(vx*vx + vy*vy);
+        cout << "PREP_CHANGE_LANE" << endl;
 
-            // check if there is a merge gap
-            if((check_car_s > car_s-10) && (check_car_s - car_s < 30)){
-              is_gap_right = false;
-            } 
-          }*/
-          break;
-        case(FOLLOW):
-          
-          /*if((check_car_s > car_s) && (check_car_s - car_s < 25)){
-            // slow down if the car in front is less than 20m ahead
-            too_close = true;
-            if(check_car_s - car_s < 15){
-              ref_vel = check_speed/2; // slow down to increase the distance between the car in front
-            } else if(check_car_s - car_s < 10){
-              ref_vel = 0; // stop as we are too close to the car in front
-            } else {
-              ref_vel = check_speed; // slow down to the speed of the vehicle in front and follow it
-            }
-          } */
-          break;
-        case(STOP):
-          
-          break;
-        case(CHANGE_LEFT):
-          
-          break;
-        case(CHANGE_RIGHT):
-          
-          break;
-      }
+        /*// Vehicles in the left lane
+        if((lane > lane_left) && d < (2+4*lane_left+2) && d > (2+4*lane_left-2)){                
+
+          // check if there is a merge gap
+          if((check_car_s > car_s-10) && (check_car_s - car_s < 30)){
+            is_gap_left = false;
+          } 
+        }
+
+        // Vehicles in the right lane
+        if((lane < lane_right) && d < (2+4*lane_right+2) && d > (2+4*lane_right-2)){                
+          double vx = sensor_fusion[i][3];
+          double vy = sensor_fusion[i][4];
+          double check_speed = sqrt(vx*vx + vy*vy);
+
+          // check if there is a merge gap
+          if((check_car_s > car_s-10) && (check_car_s - car_s < 30)){
+            is_gap_right = false;
+          } 
+        }*/
+        break;
+      case(FOLLOW):
+
+        if((d < (2+4*lane+1.8)) && (d > (2+4*lane-1.8)) && (check_car_s > car_s) && (check_car_s - car_s < 25)){
+          if(!is_new_state){
+            next_state = PREP_CHANGE_LANE;
+            is_new_state = true;
+          }
+          // slow down if the car in front is less than 20m ahead
+          too_close = true;
+
+          //if()
+
+          if(check_car_s - car_s < 15){
+            ref_vel = check_speed/2; // slow down to increase the distance between the car in front
+          } else if(check_car_s - car_s < 10){
+            ref_vel = 0; // stop as we are too close to the car in front
+          } else {
+            ref_vel = check_speed; // slow down to the speed of the vehicle in front and follow it
+          }
+        } else if(!is_new_state){
+          next_state = LANE_CLEAR;
+        }
+        cout << "FOLLOW" << endl;
+        break;
+      case(STOP):
+
+        break;
+      case(CHANGE_LEFT):
+
+        break;
+      case(CHANGE_RIGHT):
+
+        break;
     }
   }
   
@@ -506,6 +528,11 @@ int NextAction::getAction(const vector<vector<double>> &sensor_fusion, double &r
   state = next_state; // set the state for the next time around
   
   return lane;
+}
+
+void NextAction::prepLaneChangeState()
+{
+  
 }
 
 
@@ -547,9 +574,10 @@ int main() {
   }
 
   double ref_vel = 0;
+  double max_vel = 49.5;
   int state = LANE_CLEAR;
 
-  h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy, &ref_vel, &state](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
+  h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy, & max_vel, &ref_vel, &state](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                      uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
@@ -595,11 +623,11 @@ int main() {
               car_s = end_path_s;
             }
 
-            ref_vel = 49.5;
+            //ref_vel = 49.5;
             //int lane = car_d / 4;   
             bool too_close = false;
             
-            NextAction action(car_s, car_d, car_speed, prev_size);
+            NextAction action(car_s, car_d, car_speed, prev_size, max_vel);
             int lane = action.getAction(sensor_fusion, ref_vel, too_close, state);
             
             
