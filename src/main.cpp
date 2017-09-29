@@ -13,9 +13,8 @@
 #define LANE_CLEAR 0
 #define PREP_CHANGE_LANE 1
 #define FOLLOW 2
-#define STOP 3
-#define CHANGE_LEFT 4
-#define CHANGE_RIGHT 5
+#define CHANGE_LEFT 3
+#define CHANGE_RIGHT 4
 
 using namespace std;
 
@@ -413,7 +412,6 @@ int NextAction::getAction(const vector<vector<double>> &sensor_fusion, double &r
   /*LANE_CLEAR 
     PREP_CHANGE_LANE 
     FOLLOW 
-    STOP 
     CHANGE_LEFT 
     CHANGE_RIGHT 
    */ 
@@ -426,9 +424,9 @@ int NextAction::getAction(const vector<vector<double>> &sensor_fusion, double &r
     double check_car_s = sensor_fusion[i][5];
     double vx = sensor_fusion[i][3];
     double vy = sensor_fusion[i][4];
-    double check_speed = sqrt(vx*vx + vy*vy);
+    double object_speed = sqrt(vx*vx + vy*vy);
 
-    check_car_s += prev_size * 0.02 * check_speed;
+    check_car_s += prev_size * 0.02 * object_speed;
 
     // only look at objects 15m behind and 40m in front that are in the 
     // lane to the left, right and same lane as travel
@@ -472,7 +470,7 @@ int NextAction::getAction(const vector<vector<double>> &sensor_fusion, double &r
         if((lane < lane_right) && d < (2+4*lane_right+2) && d > (2+4*lane_right-2)){                
           double vx = sensor_fusion[i][3];
           double vy = sensor_fusion[i][4];
-          double check_speed = sqrt(vx*vx + vy*vy);
+          double object_speed = sqrt(vx*vx + vy*vy);
 
           // check if there is a merge gap
           if((check_car_s > car_s-10) && (check_car_s - car_s < 30)){
@@ -490,22 +488,23 @@ int NextAction::getAction(const vector<vector<double>> &sensor_fusion, double &r
           // slow down if the car in front is less than 20m ahead
           too_close = true;
 
-          //if()
+          //stop the car if the object in front is stopped or we are very close to it
+          if((object_speed <= 0.3) && (check_car_s - car_s < 5)){
+            ref_vel = 0;
+          }
 
+          // TODO: add better maths to slow and follow the vehicle in front based of it's speed and distance
           if(check_car_s - car_s < 15){
-            ref_vel = check_speed/2; // slow down to increase the distance between the car in front
+            ref_vel = object_speed/2; // slow down to increase the distance between the car in front
           } else if(check_car_s - car_s < 10){
-            ref_vel = 0; // stop as we are too close to the car in front
+            ref_vel = object_speed/4; // slow a lot as we are too close to the car in front
           } else {
-            ref_vel = check_speed; // slow down to the speed of the vehicle in front and follow it
+            ref_vel = object_speed; // slow down to the speed of the vehicle in front and follow it
           }
         } else if(!is_new_state){
           next_state = LANE_CLEAR;
         }
         cout << "FOLLOW" << endl;
-        break;
-      case(STOP):
-
         break;
       case(CHANGE_LEFT):
 
