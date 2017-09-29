@@ -274,6 +274,7 @@ double Trajectory::solveSpline(const double x){
 void Trajectory::getTrajectoryPts(vector<double> &next_x_vals, vector<double> &next_y_vals, const double ref_vel, const bool too_close) {
 
   double x_local = 0; // the current x point being considered
+  double prev_x_local, prev_y_local;
   double acceleration = 0.003; //9 * 0.02; // max allowed acceleration per step
   int way_pts_tot = 50; // how many way points are to be predicted into the future 
   
@@ -293,7 +294,12 @@ void Trajectory::getTrajectoryPts(vector<double> &next_x_vals, vector<double> &n
     double step_x = next_x_vals[next_size - 1] - next_x_vals[next_size - 2];
     double step_y = next_y_vals[next_size - 1] - next_y_vals[next_size - 2];
     step = sqrt(step_x*step_x + step_y*step_y);
+    
+    prev_x_local = step_x;
+    prev_y_local = step_y;
   }
+  
+  //cout << "Start   prev_x_local " << prev_x_local << "  prev_y_local " << prev_y_local << "  step " << step  << endl;
 
   const double mile_ph_to_meter_ps = 1609.344 / 3600.0; // 1Mph * 1609.344meter/h / 3600 = 0.44704 m/s
   const double max_step = max_vel * mile_ph_to_meter_ps * 0.02;
@@ -315,8 +321,32 @@ void Trajectory::getTrajectoryPts(vector<double> &next_x_vals, vector<double> &n
       }
     } 
 
+    
     x_local += step;
     double y_local = Trajectory::solveSpline(x_local);
+    
+    double diff_x = x_local - prev_x_local;
+    double diff_y = y_local - prev_y_local;
+    double diff_step = sqrt(diff_x*diff_x + diff_y*diff_y);
+    int loop = 0;
+    
+    while(diff_step > max_step && loop < 7){
+      double error = max_step/diff_step;
+      
+      x_local *= error;
+      y_local = Trajectory::solveSpline(x_local);
+    
+      diff_x = x_local - prev_x_local;
+      diff_y = y_local - prev_y_local;
+      diff_step = sqrt(diff_x*diff_x + diff_y*diff_y);
+      
+      //cout << "loop " << loop << "  error " << error << "  diff_x " << diff_x << "  diff_y " << diff_y << "  diff_step " << diff_step << endl;
+      loop++;
+    }
+    
+    prev_x_local = x_local;
+    prev_y_local = y_local;
+    
 
     // convert the reference point from local car centric coordinates to global coordinates
     double x_point = x_local * cos(global_yaw) - y_local * sin(global_yaw);
@@ -413,7 +443,7 @@ int main() {
               car_s = end_path_s;
             }
 
-            ref_vel = 49.0;
+            ref_vel = 49.5;
             int lane = car_d / 4;
             int lane_left = std::max(lane-1, 0);
             int lane_right = std::min(lane+1, 2);
