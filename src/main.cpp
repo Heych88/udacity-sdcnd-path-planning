@@ -32,7 +32,7 @@ string hasData(string s) {
 
 class Trajectory {
 public:
-  Trajectory(const double x_car, const double y_car, const double yaw_car, const double s_car, const double drive_lane, vector<double> prev_path_x, vector<double> prev_path_y, const double speed_car);
+  Trajectory(const double x_car, const double y_car, const double yaw_car, const double s_car, const double drive_lane, vector<double> prev_path_x, vector<double> prev_path_y, const double speed_car, const int path_size);
   virtual ~Trajectory();
   //constexpr double pi() { return M_PI; }
   double deg2rad(double x);
@@ -50,14 +50,16 @@ public:
   
 private:
   int prev_size;
+  double max_vel;
   tk::spline f_spline;
   double car_x, car_y, car_yaw, car_s, lane, car_speed, global_x, global_y, global_yaw;
   vector<double> previous_path_x, previous_path_y, ptsx, ptsy;
 };
 
-Trajectory::Trajectory(const double x_car, const double y_car, const double yaw_car, const double s_car, const double drive_lane, vector<double> prev_path_x, vector<double> prev_path_y, const double speed_car)
+Trajectory::Trajectory(const double x_car, const double y_car, const double yaw_car, const double s_car, const double drive_lane, vector<double> prev_path_x, vector<double> prev_path_y, const double speed_car, const int path_size)
 {
   car_x = x_car;
+  max_vel = 49.5;
   car_y = y_car;
   car_yaw = yaw_car;
   car_s = s_car;
@@ -65,6 +67,7 @@ Trajectory::Trajectory(const double x_car, const double y_car, const double yaw_
   previous_path_x = prev_path_x;
   previous_path_y = prev_path_y;
   car_speed = speed_car;
+  prev_size = path_size;
 }
 
 Trajectory::~Trajectory() {
@@ -202,8 +205,6 @@ vector<double> Trajectory::getXY(double s, double d, const vector<double> &maps_
 
 void Trajectory::startPoints(){
   // check if there are previous way points that can be used 
-  //double global_yaw, global_x, global_y; 
-  prev_size = previous_path_x.size(); 
   
   if(prev_size < 2){
     global_x = car_x;
@@ -271,8 +272,7 @@ double Trajectory::solveSpline(const double x){
 }
 
 void Trajectory::getTrajectoryPts(vector<double> &next_x_vals, vector<double> &next_y_vals, const double ref_vel, const bool too_close) {
-  
-  double max_vel = 49.5;
+
   double x_local = 0; // the current x point being considered
   double acceleration = 0.003; //9 * 0.02; // max allowed acceleration per step
   int way_pts_tot = 50; // how many way points are to be predicted into the future 
@@ -308,9 +308,6 @@ void Trajectory::getTrajectoryPts(vector<double> &next_x_vals, vector<double> &n
       if(step < ref_step){
         step = ref_step;
       }
-      //if(step < 0){
-      //  step = 0;
-      //}
     } else if(car_speed < ref_vel){
       step += acceleration;
       if(step > ref_step){
@@ -369,9 +366,8 @@ int main() {
   }
 
   double ref_vel = 0;
-  double max_vel = 49.2;
 
-  h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy, &ref_vel, &max_vel](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
+  h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy, &ref_vel](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                      uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
@@ -411,13 +407,13 @@ int main() {
           	json msgJson;
             
             int prev_size = previous_path_x.size(); 
-            //if(prev_size > 20) prev_size = 20;
+            if(prev_size > 20) prev_size = 20;
 
-            if(prev_size >0){
+            if(prev_size > 0){
               car_s = end_path_s;
             }
 
-            ref_vel = max_vel;
+            ref_vel = 49.0;
             int lane = car_d / 4;
             int lane_left = std::max(lane-1, 0);
             int lane_right = std::min(lane+1, 2);
@@ -499,12 +495,8 @@ int main() {
                 lane = std::min(lane + 1, 2);
               }
             }
-            
-            if(ref_vel > max_vel){
-              ref_vel = max_vel;
-            }
 
-            Trajectory car_tj(car_x, car_y, car_yaw, car_s, lane, previous_path_x, previous_path_y, car_speed);
+            Trajectory car_tj(car_x, car_y, car_yaw, car_s, lane, previous_path_x, previous_path_y, car_speed, prev_size);
             car_tj.startPoints();
 
             car_tj.makeSplinePts(map_waypoints_s, map_waypoints_x, map_waypoints_y);
