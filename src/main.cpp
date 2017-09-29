@@ -412,59 +412,97 @@ int main() {
             
             int prev_size = previous_path_x.size(); 
             //if(prev_size > 20) prev_size = 20;
-            
-            bool too_close = false;
-            
+
             if(prev_size >0){
               car_s = end_path_s;
             }
 
             ref_vel = max_vel;
             int lane = car_d / 4;
+            int lane_left = std::max(lane-1, 0);
+            int lane_right = std::min(lane+1, 2);
+            bool is_gap_left = true, is_gap_right = true, change_lane = false, too_close = false;
+            
+            if(lane == 0){
+              is_gap_left = false;
+            } else if(lane == 2){
+              is_gap_right = false;
+            }
+            
             for(int i=0; i < sensor_fusion.size(); i++){
               // car is in my lane
               float d = sensor_fusion[i][6];
-              if(d < (2+4*lane+1.8) && d > (2+4*lane-1.8)){                
-                double vx = sensor_fusion[i][3];
-                double vy = sensor_fusion[i][4];
-                double check_speed = sqrt(vx*vx + vy*vy);
-                double check_car_s = sensor_fusion[i][5];
-                
-                check_car_s += (double)previous_path_x.size() * 0.02 * check_speed;
-                
-                if((check_car_s > car_s) && (check_car_s - car_s < 30)){ 
-                  // change lane if there is a car in the current lane
-                  if(lane > 0){
-                    lane--;
-                    if(lane < 0){
-                      lane = 0;
-                    }
-                  } else {
-                    lane++;
-                    if(lane > 2){
-                      lane = 2;
-                    }
-                  }
-                  if((check_car_s > car_s) && (check_car_s - car_s < 25)){
-                    // slow down if the car in front is less than 20m ahead
-                    too_close = true;
-                    if(check_car_s - car_s < 15){
-                      ref_vel = check_speed/2; // slow down to increase the distance between the car in front
-                    } else if(check_car_s - car_s < 10){
-                      ref_vel = 0; // stop as we are too close to the car in front
-                    } else {
-                      ref_vel = check_speed; // slow down to the speed of the vehicle in front and follow it
-                    }
+              double check_car_s = sensor_fusion[i][5];
+              double vx = sensor_fusion[i][3];
+              double vy = sensor_fusion[i][4];
+              double check_speed = sqrt(vx*vx + vy*vy);
+              
+              check_car_s += (double)previous_path_x.size() * 0.02 * check_speed;
+              
+              // only look at objects 15m behind and 40m in front that are in the 
+              // lane to the left, right and same lane as travel
+              if((check_car_s > car_s-10) && (check_car_s - car_s < 40) && d < (2+4*lane_right+1.8) && d > (2+4*lane_left-1.8)){
+ 
+                // Vehicles in the left lane
+                if((lane > lane_left) && d < (2+4*lane_left+2) && d > (2+4*lane_left-2)){                
+
+                  // check if there is a merge gap
+                  if((check_car_s > car_s-10) && (check_car_s - car_s < 30)){
+                    is_gap_left = false;
                   } 
-                } 
+                }
+                
+                // Vehicles in the right lane
+                if((lane < lane_right) && d < (2+4*lane_right+2) && d > (2+4*lane_right-2)){                
+                  double vx = sensor_fusion[i][3];
+                  double vy = sensor_fusion[i][4];
+                  double check_speed = sqrt(vx*vx + vy*vy);
+
+                  // check if there is a merge gap
+                  if((check_car_s > car_s-10) && (check_car_s - car_s < 30)){
+                    is_gap_right = false;
+                  } 
+                }
+
+                // Vehicles in same lane
+                if(d < (2+4*lane+1.8) && d > (2+4*lane-1.8)){                
+                  double vx = sensor_fusion[i][3];
+                  double vy = sensor_fusion[i][4];
+                  double check_speed = sqrt(vx*vx + vy*vy);
+
+                  // vehicles directly if front
+                  if((check_car_s > car_s) && (check_car_s - car_s < 40)){ 
+                    
+                    change_lane = true;
+                    
+                    if((check_car_s > car_s) && (check_car_s - car_s < 25)){
+                      // slow down if the car in front is less than 20m ahead
+                      too_close = true;
+                      if(check_car_s - car_s < 15){
+                        ref_vel = check_speed/2; // slow down to increase the distance between the car in front
+                      } else if(check_car_s - car_s < 10){
+                        ref_vel = 0; // stop as we are too close to the car in front
+                      } else {
+                        ref_vel = check_speed; // slow down to the speed of the vehicle in front and follow it
+                      }
+                    } 
+                  }
+                }
+              }
+            }
+            
+            // change lane if there is a car in the current lane
+            if(change_lane){
+              if(is_gap_left && (lane > 0)) {
+                lane = std::max(lane - 1, 0);
+              } else if(is_gap_right) {
+                lane = std::min(lane + 1, 2);
               }
             }
             
             if(ref_vel > max_vel){
               ref_vel = max_vel;
             }
-            
-            cout << "too_close " << too_close << endl;
 
             Trajectory car_tj(car_x, car_y, car_yaw, car_s, lane, previous_path_x, previous_path_y, car_speed);
             car_tj.startPoints();
