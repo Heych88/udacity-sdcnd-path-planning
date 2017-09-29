@@ -371,9 +371,10 @@ public:
   int getAction(const vector<vector<double>> &sensor_fusion, double &ref_vel, bool &too_close, int &state);
   void prepLaneChangeState();
 private:
-  double car_s, car_d, car_speed, max_vel;
+  double car_s, car_d, car_speed, max_vel, relative_vel_cost, max_vel_cost, s_cost;
   int lane, lane_left, lane_right, prev_size, next_state;
   bool is_gap_left, is_gap_right, change_lane, is_new_state;//, too_close;
+  double left_lane_cost, right_lane_cost, current_lane_cost;
 };
   
 NextAction::NextAction(const double s_car, const double d_car, const double speed_car, const int path_size, const double max_speed)
@@ -386,10 +387,14 @@ NextAction::NextAction(const double s_car, const double d_car, const double spee
   
   prev_size = path_size;
   
+  relative_vel_cost = 1; // cost off difference between this vehicle and the object
+  max_vel_cost = 1; // cost between the speed limit and the object
+  s_cost = 100;
+  
+  lane = car_d / 4;
   lane_left = std::max(lane-1, 0);
   lane_right = std::min(lane+1, 2);
   
-  lane = car_d / 4;
   is_gap_left = true;
   is_gap_right = true;
   change_lane = false;
@@ -417,6 +422,9 @@ int NextAction::getAction(const vector<vector<double>> &sensor_fusion, double &r
    */ 
   
   next_state = state;
+  left_lane_cost = 0;
+  right_lane_cost = 0;
+  current_lane_cost = 0;
   
   for(int i=0; i < sensor_fusion.size(); i++){
     // car is in my lane
@@ -444,39 +452,67 @@ int NextAction::getAction(const vector<vector<double>> &sensor_fusion, double &r
         } else {
           ref_vel = max_vel;
         }
-        cout << "LANE_CLEAR" << endl;
         break;
       case(PREP_CHANGE_LANE):
 
-        if((check_car_s > car_s) && (check_car_s - car_s < 25)){
-          // only change the next state if a lane change has not yet to been set
-          if(next_state == PREP_CHANGE_LANE){
-            next_state = FOLLOW;
+        // check if the tracked object is between 15m behind and 40m ahead
+        if((check_car_s > (car_s - 15)) && (check_car_s - car_s < 40)){
+          
+          if((d < (2+4*lane+1.8)) && (d > (2+4*lane-1.8))){
+            if((check_car_s > car_s) && (check_car_s - car_s < 25)){
+              // only change the next state if a lane change has not yet to been set
+              if(next_state == PREP_CHANGE_LANE){
+                next_state = FOLLOW;
+              }
+              break;
+            } else if(!is_new_state){
+              next_state = LANE_CLEAR;
+              is_new_state = true;
+            }
           }
-        } 
 
-        cout << "PREP_CHANGE_LANE" << endl;
+          // velocity cost between this vehicle and the object speed
+          double cost = std::abs(car_speed - object_speed) * relative_vel_cost;
+          // velocity cost between the speed limit and the objects speed
+          cost += std::abs(max_vel - object_speed) * max_vel_cost;
+          // cost for the distance between this vehicle and the object 
+          cost += (1 - std::abs(car_s - check_car_s) / 40.0) * s_cost;
+          // cost for the distance between this vehicle and the object 1 second in the future
+          cost += (1 - std::abs((car_s + car_speed) - (check_car_s + object_speed)) / 40.0) * s_cost;
+          
+          // check if the object is in the left lane
+          if((d < (2+4*lane_left+2)) && (d > (2+4*lane_left-2))){
+            left_lane_cost += cost;
+          } else if((d < (2+4*lane_right+2)) && (d > (2+4*lane_right-2))){
+            // check if the object is in the right lane
+            right_lane_cost += cost;
+          } else {
+            current_lane_cost += cost;
+          }
 
-        /*// Vehicles in the left lane
-        if((lane > lane_left) && d < (2+4*lane_left+2) && d > (2+4*lane_left-2)){                
+          //cout << "PREP_CHANGE_LANE " << cost << endl;
 
-          // check if there is a merge gap
-          if((check_car_s > car_s-10) && (check_car_s - car_s < 30)){
-            is_gap_left = false;
-          } 
+          /*// Vehicles in the left lane
+          if((lane > lane_left) && d < (2+4*lane_left+2) && d > (2+4*lane_left-2)){                
+
+            // check if there is a merge gap
+            if((check_car_s > car_s-10) && (check_car_s - car_s < 30)){
+              is_gap_left = false;
+            } 
+          }
+
+          // Vehicles in the right lane
+          if((lane < lane_right) && d < (2+4*lane_right+2) && d > (2+4*lane_right-2)){                
+            double vx = sensor_fusion[i][3];
+            double vy = sensor_fusion[i][4];
+            double object_speed = sqrt(vx*vx + vy*vy);
+
+            // check if there is a merge gap
+            if((check_car_s > car_s-10) && (check_car_s - car_s < 30)){
+              is_gap_right = false;
+            } 
+          }*/
         }
-
-        // Vehicles in the right lane
-        if((lane < lane_right) && d < (2+4*lane_right+2) && d > (2+4*lane_right-2)){                
-          double vx = sensor_fusion[i][3];
-          double vy = sensor_fusion[i][4];
-          double object_speed = sqrt(vx*vx + vy*vy);
-
-          // check if there is a merge gap
-          if((check_car_s > car_s-10) && (check_car_s - car_s < 30)){
-            is_gap_right = false;
-          } 
-        }*/
         break;
       case(FOLLOW):
 
@@ -504,7 +540,7 @@ int NextAction::getAction(const vector<vector<double>> &sensor_fusion, double &r
         } else if(!is_new_state){
           next_state = LANE_CLEAR;
         }
-        cout << "FOLLOW" << endl;
+        //cout << "FOLLOW" << endl;
         break;
       case(CHANGE_LEFT):
 
@@ -515,12 +551,15 @@ int NextAction::getAction(const vector<vector<double>> &sensor_fusion, double &r
     }
   }
   
-  // change lane if there is a car in the current lane
-  if(change_lane){
-    if(is_gap_left && (lane > 0)) {
-      lane = std::max(lane - 1, 0);
-    } else if(is_gap_right) {
-      lane = std::min(lane + 1, 2);
+  if(state == PREP_CHANGE_LANE){
+    cout << "left_lane_cost " << left_lane_cost << "  right_lane_cost " << right_lane_cost << "  current_lane_cost " << current_lane_cost << endl;
+
+    if((left_lane_cost < right_lane_cost) && (left_lane_cost < current_lane_cost)){
+      // TODO: call change lane left state
+      //lane = std::max(lane - 1, 0);
+    } else if((right_lane_cost < left_lane_cost) && (right_lane_cost < current_lane_cost)){
+      // TODO: call change lane right state
+      //lane = std::min(lane + 1, 2);
     }
   }
   
