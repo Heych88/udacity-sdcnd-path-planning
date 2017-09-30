@@ -366,8 +366,9 @@ void Trajectory::getTrajectoryPts(vector<double> &next_x_vals, vector<double> &n
 
 class NextAction {
 public:
-  NextAction(const double s_car, const double d_car, const double speed_car, const int path_size, const double max_speed);
+  NextAction(const double max_speed);
   virtual ~NextAction();
+  void setVehicleVariables(const double s_car, const double d_car, const double speed_car, const int path_size);
   int getAction(const vector<vector<double>> &sensor_fusion, double &ref_vel, bool &too_close, int &state);
   void prepLaneChangeState();
 private:
@@ -377,19 +378,31 @@ private:
   double left_lane_cost, right_lane_cost, current_lane_cost;
 };
   
-NextAction::NextAction(const double s_car, const double d_car, const double speed_car, const int path_size, const double max_speed)
+NextAction::NextAction(const double max_speed)
+{
+  car_s = 0;
+  car_d = 0;
+  car_speed = 0;
+  prev_size = 0;
+  is_new_state = false;
+  max_vel = max_speed;
+  
+  relative_vel_cost = 10; // cost off difference between this vehicle and the object
+  max_vel_cost = 10; // cost between the speed limit and the object
+  s_cost = 100;
+}
+
+NextAction::~NextAction() 
+{
+  
+}
+
+void NextAction::setVehicleVariables(const double s_car, const double d_car, const double speed_car, const int path_size)
 {
   car_s = s_car;
   car_d = d_car;
   car_speed = speed_car;
-  is_new_state = false;
-  max_vel = max_speed;
-  
   prev_size = path_size;
-  
-  relative_vel_cost = 1; // cost off difference between this vehicle and the object
-  max_vel_cost = 1; // cost between the speed limit and the object
-  s_cost = 100;
   
   lane = car_d / 4;
   lane_left = std::max(lane-1, 0);
@@ -407,21 +420,11 @@ NextAction::NextAction(const double s_car, const double d_car, const double spee
   }
 }
 
-NextAction::~NextAction() 
-{
-  
-}
-
 int NextAction::getAction(const vector<vector<double>> &sensor_fusion, double &ref_vel, bool &too_close, int &state)
 {
-  /*LANE_CLEAR 
-    PREP_CHANGE_LANE 
-    FOLLOW 
-    CHANGE_LEFT 
-    CHANGE_RIGHT 
-   */ 
   
   next_state = state;
+  is_new_state = false;
   left_lane_cost = 0;
   right_lane_cost = 0;
   current_lane_cost = 0;
@@ -452,6 +455,7 @@ int NextAction::getAction(const vector<vector<double>> &sensor_fusion, double &r
         } else {
           ref_vel = max_vel;
         }
+        //cout << "LANE_CLEAR " << endl;
         break;
       case(PREP_CHANGE_LANE):
 
@@ -574,6 +578,8 @@ void NextAction::prepLaneChangeState()
 }
 
 
+
+
 int main() {
   uWS::Hub h;
 
@@ -614,8 +620,10 @@ int main() {
   double ref_vel = 0;
   double max_vel = 49.5;
   int state = LANE_CLEAR;
+  
+  NextAction action(max_vel);
 
-  h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy, & max_vel, &ref_vel, &state](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
+  h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy, &action, &max_vel, &ref_vel, &state](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                      uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
@@ -665,7 +673,7 @@ int main() {
             //int lane = car_d / 4;   
             bool too_close = false;
             
-            NextAction action(car_s, car_d, car_speed, prev_size, max_vel);
+            action.setVehicleVariables(car_s, car_d, car_speed, prev_size);
             int lane = action.getAction(sensor_fusion, ref_vel, too_close, state);
             
             
