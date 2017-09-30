@@ -370,7 +370,7 @@ public:
   virtual ~NextAction();
   void setVehicleVariables(const double s_car, const double d_car, const double speed_car, const int path_size);
   int getAction(const vector<vector<double>> &sensor_fusion, double &ref_vel, bool &too_close, int &state);
-  void prepLaneChangeState();
+  void prepLaneChangeState(const vector<vector<double>> &sensor_fusion, double &ref_vel);
 private:
   double car_s, car_d, car_speed, max_vel, relative_vel_cost, max_vel_cost, s_cost;
   int lane, lane_left, lane_right, prev_size, next_state;
@@ -428,23 +428,23 @@ int NextAction::getAction(const vector<vector<double>> &sensor_fusion, double &r
   left_lane_cost = 0;
   right_lane_cost = 0;
   current_lane_cost = 0;
-  
-  for(int i=0; i < sensor_fusion.size(); i++){
-    // car is in my lane
-    float d = sensor_fusion[i][6];
-    double check_car_s = sensor_fusion[i][5];
-    double vx = sensor_fusion[i][3];
-    double vy = sensor_fusion[i][4];
-    double object_speed = sqrt(vx*vx + vy*vy);
 
-    check_car_s += prev_size * 0.02 * object_speed;
+  switch(state){
+    case(LANE_CLEAR):
+      for(int i=0; i < sensor_fusion.size(); i++){
+        // car is in my lane
+        float d = sensor_fusion[i][6];
+        double check_car_s = sensor_fusion[i][5];
+        double vx = sensor_fusion[i][3];
+        double vy = sensor_fusion[i][4];
+        double object_speed = sqrt(vx*vx + vy*vy);
 
-    // only look at objects 15m behind and 40m in front that are in the 
-    // lane to the left, right and same lane as travel
-    //if((check_car_s > car_s-15) && (check_car_s - car_s < 40) && d < (2+4*lane_right+1.8) && d > (2+4*lane_left-1.8)){
+        check_car_s += prev_size * 0.02 * object_speed;
 
-    switch(state){
-      case(LANE_CLEAR):
+        // only look at objects 15m behind and 40m in front that are in the 
+        // lane to the left, right and same lane as travel
+        //if((check_car_s > car_s-15) && (check_car_s - car_s < 40) && d < (2+4*lane_right+1.8) && d > (2+4*lane_left-1.8)){
+    
         // Check if there is a vehicle in front and in same lane 
         if((d < (2+4*lane+1.8)) && (d > (2+4*lane-1.8)) && (check_car_s > car_s) && (check_car_s - car_s < 40)){                
           // only change the next state if we haven't changed it already
@@ -455,71 +455,29 @@ int NextAction::getAction(const vector<vector<double>> &sensor_fusion, double &r
         } else {
           ref_vel = max_vel;
         }
-        //cout << "LANE_CLEAR " << endl;
-        break;
-      case(PREP_CHANGE_LANE):
+      }
+      //cout << "LANE_CLEAR " << endl;
+      break;
+    case(PREP_CHANGE_LANE):
 
-        // check if the tracked object is between 15m behind and 40m ahead
-        if((check_car_s > (car_s - 15)) && (check_car_s - car_s < 40)){
-          
-          if((d < (2+4*lane+1.8)) && (d > (2+4*lane-1.8))){
-            if((check_car_s > car_s) && (check_car_s - car_s < 25)){
-              // only change the next state if a lane change has not yet to been set
-              if(next_state == PREP_CHANGE_LANE){
-                next_state = FOLLOW;
-              }
-              break;
-            } else if(!is_new_state){
-              next_state = LANE_CLEAR;
-              is_new_state = true;
-            }
-          }
+      NextAction::prepLaneChangeState(sensor_fusion, ref_vel);
+      break;
+    case(FOLLOW):
 
-          // velocity cost between this vehicle and the object speed
-          double cost = std::abs(car_speed - object_speed) * relative_vel_cost;
-          // velocity cost between the speed limit and the objects speed
-          cost += std::abs(max_vel - object_speed) * max_vel_cost;
-          // cost for the distance between this vehicle and the object 
-          cost += (1 - std::abs(car_s - check_car_s) / 40.0) * s_cost;
-          // cost for the distance between this vehicle and the object 1 second in the future
-          cost += (1 - std::abs((car_s + car_speed) - (check_car_s + object_speed)) / 40.0) * s_cost;
-          
-          // check if the object is in the left lane
-          if((d < (2+4*lane_left+2)) && (d > (2+4*lane_left-2))){
-            left_lane_cost += cost;
-          } else if((d < (2+4*lane_right+2)) && (d > (2+4*lane_right-2))){
-            // check if the object is in the right lane
-            right_lane_cost += cost;
-          } else {
-            current_lane_cost += cost;
-          }
+      for(int i=0; i < sensor_fusion.size(); i++){
+        // car is in my lane
+        float d = sensor_fusion[i][6];
+        double check_car_s = sensor_fusion[i][5];
+        double vx = sensor_fusion[i][3];
+        double vy = sensor_fusion[i][4];
+        double object_speed = sqrt(vx*vx + vy*vy);
 
-          //cout << "PREP_CHANGE_LANE " << cost << endl;
+        check_car_s += prev_size * 0.02 * object_speed;
 
-          /*// Vehicles in the left lane
-          if((lane > lane_left) && d < (2+4*lane_left+2) && d > (2+4*lane_left-2)){                
-
-            // check if there is a merge gap
-            if((check_car_s > car_s-10) && (check_car_s - car_s < 30)){
-              is_gap_left = false;
-            } 
-          }
-
-          // Vehicles in the right lane
-          if((lane < lane_right) && d < (2+4*lane_right+2) && d > (2+4*lane_right-2)){                
-            double vx = sensor_fusion[i][3];
-            double vy = sensor_fusion[i][4];
-            double object_speed = sqrt(vx*vx + vy*vy);
-
-            // check if there is a merge gap
-            if((check_car_s > car_s-10) && (check_car_s - car_s < 30)){
-              is_gap_right = false;
-            } 
-          }*/
-        }
-        break;
-      case(FOLLOW):
-
+        // only look at objects 15m behind and 40m in front that are in the 
+        // lane to the left, right and same lane as travel
+        //if((check_car_s > car_s-15) && (check_car_s - car_s < 40) && d < (2+4*lane_right+1.8) && d > (2+4*lane_left-1.8)){
+        
         if((d < (2+4*lane+1.8)) && (d > (2+4*lane-1.8)) && (check_car_s > car_s) && (check_car_s - car_s < 25)){
           if(!is_new_state){
             next_state = PREP_CHANGE_LANE;
@@ -544,18 +502,106 @@ int NextAction::getAction(const vector<vector<double>> &sensor_fusion, double &r
         } else if(!is_new_state){
           next_state = LANE_CLEAR;
         }
-        //cout << "FOLLOW" << endl;
-        break;
-      case(CHANGE_LEFT):
+      }
+      //cout << "FOLLOW" << endl;
+      break;
+    case(CHANGE_LEFT):
 
-        break;
-      case(CHANGE_RIGHT):
+      break;
+    case(CHANGE_RIGHT):
 
-        break;
+      break;
+  }
+  
+  state = next_state; // set the state for the next time around
+  
+  return lane;
+}
+
+void NextAction::prepLaneChangeState(const vector<vector<double>> &sensor_fusion, double &ref_vel)
+{
+  //next_state = state;
+  is_new_state = false;
+  left_lane_cost = 0;
+  right_lane_cost = 0;
+  current_lane_cost = 0;
+  
+  for(int i=0; i < sensor_fusion.size(); i++){
+    // car is in my lane
+    float d = sensor_fusion[i][6];
+    double check_car_s = sensor_fusion[i][5];
+    double vx = sensor_fusion[i][3];
+    double vy = sensor_fusion[i][4];
+    double object_speed = sqrt(vx*vx + vy*vy);
+
+    check_car_s += prev_size * 0.02 * object_speed;
+
+    // only look at objects 15m behind and 40m in front that are in the 
+    // lane to the left, right and same lane as travel
+    //if((check_car_s > car_s-15) && (check_car_s - car_s < 40) && d < (2+4*lane_right+1.8) && d > (2+4*lane_left-1.8)){
+
+      // check if the tracked object is between 15m behind and 40m ahead
+      if((check_car_s > (car_s - 15)) && (check_car_s - car_s < 40)){
+
+        if((d < (2+4*lane+1.8)) && (d > (2+4*lane-1.8))){
+          if((check_car_s > car_s) && (check_car_s - car_s < 25)){
+            // only change the next state if a lane change has not yet to been set
+            if(next_state == PREP_CHANGE_LANE){
+              next_state = FOLLOW;
+            }
+            break;
+          } else if(!is_new_state){
+            next_state = LANE_CLEAR;
+            is_new_state = true;
+          }
+        }
+
+        // velocity cost between this vehicle and the object speed
+        double cost = std::abs(car_speed - object_speed) * relative_vel_cost;
+        // velocity cost between the speed limit and the objects speed
+        cost += std::abs(max_vel - object_speed) * max_vel_cost;
+        // cost for the distance between this vehicle and the object 
+        cost += (1 - std::abs(car_s - check_car_s) / 40.0) * s_cost;
+        // cost for the distance between this vehicle and the object 1 second in the future
+        cost += (1 - std::abs((car_s + car_speed) - (check_car_s + object_speed)) / 40.0) * s_cost;
+
+        // check if the object is in the left lane
+        if((d < (2+4*lane_left+2)) && (d > (2+4*lane_left-2))){
+          left_lane_cost += cost;
+        } else if((d < (2+4*lane_right+2)) && (d > (2+4*lane_right-2))){
+          // check if the object is in the right lane
+          right_lane_cost += cost;
+        } else {
+          current_lane_cost += cost;
+        }
+
+        //cout << "PREP_CHANGE_LANE " << cost << endl;
+
+        /*// Vehicles in the left lane
+        if((lane > lane_left) && d < (2+4*lane_left+2) && d > (2+4*lane_left-2)){                
+
+          // check if there is a merge gap
+          if((check_car_s > car_s-10) && (check_car_s - car_s < 30)){
+            is_gap_left = false;
+          } 
+        }
+
+        // Vehicles in the right lane
+        if((lane < lane_right) && d < (2+4*lane_right+2) && d > (2+4*lane_right-2)){                
+          double vx = sensor_fusion[i][3];
+          double vy = sensor_fusion[i][4];
+          double object_speed = sqrt(vx*vx + vy*vy);
+
+          // check if there is a merge gap
+          if((check_car_s > car_s-10) && (check_car_s - car_s < 30)){
+            is_gap_right = false;
+          } 
+        }*/
     }
   }
   
-  if(state == PREP_CHANGE_LANE){
+  
+  //*if(state == PREP_CHANGE_LANE){
     cout << "left_lane_cost " << left_lane_cost << "  right_lane_cost " << right_lane_cost << "  current_lane_cost " << current_lane_cost << endl;
 
     if((left_lane_cost < right_lane_cost) && (left_lane_cost < current_lane_cost)){
@@ -565,16 +611,7 @@ int NextAction::getAction(const vector<vector<double>> &sensor_fusion, double &r
       // TODO: call change lane right state
       //lane = std::min(lane + 1, 2);
     }
-  }
-  
-  state = next_state; // set the state for the next time around
-  
-  return lane;
-}
-
-void NextAction::prepLaneChangeState()
-{
-  
+  //}*/
 }
 
 
