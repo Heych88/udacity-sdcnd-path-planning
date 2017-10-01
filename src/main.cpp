@@ -5,6 +5,7 @@
 #include <iostream>
 #include <thread>
 #include <vector>
+#include <queue>
 #include "Eigen-3.3/Eigen/Core"
 #include "Eigen-3.3/Eigen/QR"
 #include "json.hpp"
@@ -362,6 +363,62 @@ void Trajectory::getTrajectoryPts(vector<double> &next_x_vals, vector<double> &n
   }
 }
 
+// Moving average class for a Queue 
+// Original Source code by mehuld https://discuss.leetcode.com/topic/45731/c-solution-using-a-queue-calculate-average-in-o-1
+class MovingAverage {
+private:
+    queue<int> q;
+    int queue_size;
+    int sum;
+public:
+  /** Initialize your data structure here. */
+  MovingAverage() 
+  {
+     sum = 0;
+  }
+
+  void setSize(const int size)
+  {
+    queue_size = size;
+  }
+  
+  int getSize()
+  {
+    return q.size();
+  }
+  
+  void emptyQueue()
+  {
+    while (!q.empty())
+    {
+      q.pop();
+    }
+    sum = 0;
+  }
+
+  double nextAverage(const int val) 
+  {
+    if(q.size() < queue_size)
+    {
+      q.push(val);
+      sum = sum + val;
+    }
+    else if(q.size() == queue_size)
+    {
+      int top = q.front();
+      sum = sum - top;
+      q.pop();
+      q.push(val);
+      sum = sum + val;
+    }
+
+    if(q.size() > 0)
+      return double(sum)/(q.size());
+    else
+      return 0;
+  }
+};
+
 
 class NextAction {
 public:
@@ -372,9 +429,11 @@ public:
   void prepLaneChangeState(const vector<vector<double>> &sensor_fusion, double &ref_vel);
 private:
   double car_s, car_d, car_speed, max_vel, relative_vel_cost, max_vel_cost, s_cost;
-  int lane, lane_left, lane_right, prev_size, next_state;
+  int lane, lane_left, lane_right, prev_size, next_state, filter_size;
   bool is_gap_left, is_gap_right, change_lane, is_new_state;//, too_close;
   double left_lane_cost, right_lane_cost, current_lane_cost, look_ahead_dist;
+  
+  MovingAverage left_ma, right_ma, current_ma;
 };
   
 NextAction::NextAction(const double max_speed)
@@ -386,12 +445,17 @@ NextAction::NextAction(const double max_speed)
   is_new_state = false;
   max_vel = max_speed;
   lane = -1;
-  
+
   look_ahead_dist = 40.0;
   
   relative_vel_cost = 1; // cost off difference between this vehicle and the object
   max_vel_cost = 1; // cost between the speed limit and the object
-  s_cost = 50;
+  s_cost = 100;
+  
+  filter_size = 20;
+  left_ma.setSize(filter_size);
+  right_ma.setSize(filter_size);
+  current_ma.setSize(filter_size);
 }
 
 NextAction::~NextAction() 
@@ -468,6 +532,7 @@ int NextAction::getAction(const vector<vector<double>> &sensor_fusion, double &r
       }
   
       NextAction::prepLaneChangeState(sensor_fusion, ref_vel);
+      //cout << "PREP_CHANGE_LANE " << endl;
       break;
     case(FOLLOW):
 
@@ -515,8 +580,20 @@ int NextAction::getAction(const vector<vector<double>> &sensor_fusion, double &r
     case(CHANGE_LANE):
 
       ref_vel = max_vel;
-      cout << "CHANGE_LANE" << endl;
+      
+      if((car_d < (2+4*lane+0.5)) && (car_d > (2+4*lane-0.5))){
+        next_state = LANE_CLEAR;
+      }
+      
+      left_ma.emptyQueue();
+      right_ma.emptyQueue();
+      current_ma.emptyQueue();
+      
+      //cout << "CHANGE_LANE" << endl;
       break;
+    default:
+      next_state = LANE_CLEAR;
+      //cout << "default" << endl;
   }
   
   state = next_state; // set the state for the next time around
@@ -570,37 +647,22 @@ void NextAction::prepLaneChangeState(const vector<vector<double>> &sensor_fusion
     }
   }
   
-  /* Vehicles in the left lane
-  if((lane > lane_left) && d < (2+4*lane_left+2) && d > (2+4*lane_left-2)){                
+  left_lane_cost = left_ma.nextAverage(left_lane_cost);
+  right_lane_cost = right_ma.nextAverage(right_lane_cost);
+  current_lane_cost = current_ma.nextAverage(current_lane_cost);
 
-    // check if there is a merge gap
-    if((check_car_s > car_s-10) && (check_car_s - car_s < 30)){
-      is_gap_left = false;
-    } 
+  if(left_ma.getSize() == filter_size){
+    if((left_lane_cost <= right_lane_cost) && (left_lane_cost < current_lane_cost)){
+      // TODO: call change lane left state
+      lane = std::max(lane - 1, 0);
+      next_state = CHANGE_LANE;
+    } else if((right_lane_cost < left_lane_cost) && (right_lane_cost < current_lane_cost)){
+      // TODO: call change lane right state
+      lane = std::min(lane + 1, 2);
+      next_state = CHANGE_LANE;
+    }
+    //cout << "Lane " << lane << "   L " << left_lane_cost << "  C " << current_lane_cost << "  R " << right_lane_cost << endl;
   }
-
-  // Vehicles in the right lane
-  if((lane < lane_right) && d < (2+4*lane_right+2) && d > (2+4*lane_right-2)){                
-    double vx = sensor_fusion[i][3];
-    double vy = sensor_fusion[i][4];
-    double object_speed = sqrt(vx*vx + vy*vy);
-
-    // check if there is a merge gap
-    if((check_car_s > car_s-10) && (check_car_s - car_s < 30)){
-      is_gap_right = false;
-    } 
-  }*/
-
-  if((left_lane_cost <= right_lane_cost) && (left_lane_cost < current_lane_cost)){
-    // TODO: call change lane left state
-    lane = std::max(lane - 1, 0);
-    next_state = CHANGE_LANE;
-  } else if((right_lane_cost < left_lane_cost) && (right_lane_cost < current_lane_cost)){
-    // TODO: call change lane right state
-    lane = std::min(lane + 1, 2);
-    next_state = CHANGE_LANE;
-  }
-  cout << "Lane " << lane << "   L " << left_lane_cost << "  C " << current_lane_cost << "  R " << right_lane_cost << endl;
 }
 
 
