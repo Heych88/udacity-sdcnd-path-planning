@@ -66,7 +66,7 @@ private:
 Trajectory::Trajectory(const double x_car, const double y_car, const double yaw_car, const double s_car, const double drive_lane, vector<double> prev_path_x, vector<double> prev_path_y, const double speed_car, const int path_size)
 {
   car_x = x_car;
-  max_vel = 49.5;
+  max_vel = 49.0;
   car_y = y_car;
   car_yaw = yaw_car;
   car_s = s_car;
@@ -282,8 +282,8 @@ void Trajectory::getTrajectoryPts(vector<double> &next_x_vals, vector<double> &n
 
   double x_local = 0; // the current x point being considered
   double prev_x_local, prev_y_local;
-  double acceleration = 0.002; //9 * 0.02; // max allowed acceleration per step
-  int way_pts_tot = 40; // how many way points are to be predicted into the future 
+  double acceleration = 0.003; //9 * 0.02; // max allowed acceleration per step
+  int way_pts_tot = 80; // how many way points are to be predicted into the future 
   
   // Store the unused old way points to create a smooth path transition
   for(int i=0; i < prev_size; i++){
@@ -332,12 +332,13 @@ void Trajectory::getTrajectoryPts(vector<double> &next_x_vals, vector<double> &n
     x_local += step;
     double y_local = Trajectory::solveSpline(x_local);
     
-    double diff_x = x_local - prev_x_local;
+    // TODO: fix velocity step check below as it causes excessive jerk on back part of track
+    /*double diff_x = x_local - prev_x_local;
     double diff_y = y_local - prev_y_local;
     double diff_step = sqrt(diff_x*diff_x + diff_y*diff_y);
     int loop = 0;
     
-    while(diff_step > max_step && loop < 7){
+    while(diff_step > max_step && loop < 1){
       double error = max_step/diff_step;
       
       x_local *= error;
@@ -347,14 +348,13 @@ void Trajectory::getTrajectoryPts(vector<double> &next_x_vals, vector<double> &n
       diff_y = y_local - prev_y_local;
       diff_step = sqrt(diff_x*diff_x + diff_y*diff_y);
       
-      //cout << "loop " << loop << "  error " << error << "  diff_x " << diff_x << "  diff_y " << diff_y << "  diff_step " << diff_step << endl;
+      cout << "loop " << loop << "  error " << error << "  diff_x " << diff_x << "  diff_y " << diff_y << "  diff_step " << diff_step << endl;
       loop++;
     }
     
     prev_x_local = x_local;
-    prev_y_local = y_local;
+    prev_y_local = y_local;*/
     
-
     // convert the reference point from local car centric coordinates to global coordinates
     double x_point = x_local * cos(global_yaw) - y_local * sin(global_yaw);
     double y_point = x_local * sin(global_yaw) + y_local * cos(global_yaw);
@@ -427,7 +427,7 @@ public:
   virtual ~NextAction();
   void setVehicleVariables(const double s_car, const double d_car, const double speed_car, const int path_size);
   int getAction(const vector<vector<double>> &sensor_fusion, double &ref_vel, bool &too_close, int &state);
-  void prepLaneChangeState(const vector<vector<double>> &sensor_fusion, double &ref_vel);
+  void prepLaneChangeState(const vector<vector<double>> &sensor_fusion);
 private:
   double car_s, car_d, car_speed, max_vel, relative_vel_cost, max_vel_cost, s_cost;
   int lane, lane_left, lane_right, prev_size, next_state, filter_size;
@@ -532,7 +532,7 @@ int NextAction::getAction(const vector<vector<double>> &sensor_fusion, double &r
         right_lane_cost = 10000;
       }
   
-      NextAction::prepLaneChangeState(sensor_fusion, ref_vel);
+      NextAction::prepLaneChangeState(sensor_fusion);
       //cout << "PREP_CHANGE_LANE " << endl;
       break;
     case(FOLLOW):
@@ -628,7 +628,7 @@ int NextAction::getAction(const vector<vector<double>> &sensor_fusion, double &r
   return lane;
 }
 
-void NextAction::prepLaneChangeState(const vector<vector<double>> &sensor_fusion, double &ref_vel)
+void NextAction::prepLaneChangeState(const vector<vector<double>> &sensor_fusion)
 {
   for(int i=0; i < sensor_fusion.size(); i++){
     // car is in my lane
@@ -731,7 +731,7 @@ int main() {
   }
 
   double ref_vel = 0;
-  double max_vel = 49.5;
+  double max_vel = 49.0;
   int state = LANE_CLEAR;
   
   NextAction action(max_vel);
