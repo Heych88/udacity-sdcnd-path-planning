@@ -14,7 +14,8 @@
 #define LANE_CLEAR 0
 #define PREP_CHANGE_LANE 1
 #define FOLLOW 2
-#define CHANGE_LANE 3
+#define CHANGE_LEFT 3
+#define CHANGE_RIGHT 4
 
 using namespace std;
 
@@ -281,8 +282,8 @@ void Trajectory::getTrajectoryPts(vector<double> &next_x_vals, vector<double> &n
 
   double x_local = 0; // the current x point being considered
   double prev_x_local, prev_y_local;
-  double acceleration = 0.003; //9 * 0.02; // max allowed acceleration per step
-  int way_pts_tot = 50; // how many way points are to be predicted into the future 
+  double acceleration = 0.002; //9 * 0.02; // max allowed acceleration per step
+  int way_pts_tot = 40; // how many way points are to be predicted into the future 
   
   // Store the unused old way points to create a smooth path transition
   for(int i=0; i < prev_size; i++){
@@ -367,7 +368,7 @@ void Trajectory::getTrajectoryPts(vector<double> &next_x_vals, vector<double> &n
 // Original Source code by mehuld https://discuss.leetcode.com/topic/45731/c-solution-using-a-queue-calculate-average-in-o-1
 class MovingAverage {
 private:
-    queue<int> q;
+    queue<double> q;
     int queue_size;
     int sum;
 public:
@@ -446,7 +447,7 @@ NextAction::NextAction(const double max_speed)
   max_vel = max_speed;
   lane = -1;
 
-  look_ahead_dist = 40.0;
+  look_ahead_dist = 60.0;
   
   relative_vel_cost = 1; // cost off difference between this vehicle and the object
   max_vel_cost = 1; // cost between the speed limit and the object
@@ -577,19 +578,45 @@ int NextAction::getAction(const vector<vector<double>> &sensor_fusion, double &r
       }
       //cout << "FOLLOW" << endl;
       break;
-    case(CHANGE_LANE):
+    case(CHANGE_LEFT):
 
       ref_vel = max_vel;
       
-      if((car_d < (2+4*lane+0.5)) && (car_d > (2+4*lane-0.5))){
-        next_state = LANE_CLEAR;
+      if(car_speed >= 43.0) { //++change_loop_counter > loop_size){
+        lane = std::max(lane - 1, 0);
+
+        if((car_d < (2+4*lane+0.5)) && (car_d > (2+4*lane-0.5))){
+          next_state = LANE_CLEAR;
+        } else {
+          next_state = FOLLOW;
+        }
+
+        left_ma.emptyQueue();
+        right_ma.emptyQueue();
+        current_ma.emptyQueue();
       }
       
-      left_ma.emptyQueue();
-      right_ma.emptyQueue();
-      current_ma.emptyQueue();
+      //cout << "CHANGE_LEFT" << endl;
+      break;
+    case(CHANGE_RIGHT):
+
+      ref_vel = max_vel;
       
-      //cout << "CHANGE_LANE" << endl;
+      if(car_speed >= 43.0) { //++change_loop_counter > loop_size){
+        lane = std::min(lane + 1, 2);
+
+        if((car_d < (2+4*lane+0.25)) && (car_d > (2+4*lane-0.25))){
+          next_state = LANE_CLEAR;
+        } else {
+          next_state = FOLLOW;
+        }
+
+        left_ma.emptyQueue();
+        right_ma.emptyQueue();
+        current_ma.emptyQueue();
+      }
+      
+      //cout << "CHANGE_RIGHT" << endl;
       break;
     default:
       next_state = LANE_CLEAR;
@@ -654,12 +681,10 @@ void NextAction::prepLaneChangeState(const vector<vector<double>> &sensor_fusion
   if(left_ma.getSize() == filter_size){
     if((left_lane_cost <= right_lane_cost) && (left_lane_cost < current_lane_cost)){
       // TODO: call change lane left state
-      lane = std::max(lane - 1, 0);
-      next_state = CHANGE_LANE;
+      next_state = CHANGE_LEFT;
     } else if((right_lane_cost < left_lane_cost) && (right_lane_cost < current_lane_cost)){
       // TODO: call change lane right state
-      lane = std::min(lane + 1, 2);
-      next_state = CHANGE_LANE;
+      next_state = CHANGE_RIGHT;
     }
     //cout << "Lane " << lane << "   L " << left_lane_cost << "  C " << current_lane_cost << "  R " << right_lane_cost << endl;
   }
@@ -751,7 +776,9 @@ int main() {
           	json msgJson;
             
             int prev_size = previous_path_x.size(); 
-            if(prev_size > 20) prev_size = 20;
+            /*if((state == FOLLOW) && (prev_size > 20)) { // || (state == CHANGE_RIGHT) || (state == CHANGE_LEFT)
+              prev_size = 20;
+            }*/
 
             if(prev_size > 0){
               car_s = end_path_s;
