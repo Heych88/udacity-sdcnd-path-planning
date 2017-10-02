@@ -283,7 +283,7 @@ void Trajectory::getTrajectoryPts(vector<double> &next_x_vals, vector<double> &n
   double x_local = 0; // the current x point being considered
   double prev_x_local, prev_y_local;
   double acceleration = 0.003; //9 * 0.02; // max allowed acceleration per step
-  int way_pts_tot = 80; // how many way points are to be predicted into the future 
+  int way_pts_tot = 50; // how many way points are to be predicted into the future 
   
   // Store the unused old way points to create a smooth path transition
   for(int i=0; i < prev_size; i++){
@@ -447,13 +447,13 @@ NextAction::NextAction(const double max_speed)
   max_vel = max_speed;
   lane = -1;
 
-  look_ahead_dist = 60.0;
+  look_ahead_dist = 40.0;
   
   relative_vel_cost = 1; // cost off difference between this vehicle and the object
   max_vel_cost = 1; // cost between the speed limit and the object
   s_cost = 100;
   
-  filter_size = 20;
+  filter_size = 10;
   left_ma.setSize(filter_size);
   right_ma.setSize(filter_size);
   current_ma.setSize(filter_size);
@@ -582,19 +582,19 @@ int NextAction::getAction(const vector<vector<double>> &sensor_fusion, double &r
 
       ref_vel = max_vel;
       
-      if(car_speed >= 43.0) { //++change_loop_counter > loop_size){
-        lane = std::max(lane - 1, 0);
+      //if(car_speed >= 43.0) { //++change_loop_counter > loop_size){
+        
 
         if((car_d < (2+4*lane+0.5)) && (car_d > (2+4*lane-0.5))){
           next_state = LANE_CLEAR;
-        } else {
-          next_state = FOLLOW;
-        }
+        } //else {
+          //next_state = FOLLOW;
+        //}
 
         left_ma.emptyQueue();
         right_ma.emptyQueue();
         current_ma.emptyQueue();
-      }
+      //}
       
       //cout << "CHANGE_LEFT" << endl;
       break;
@@ -602,19 +602,19 @@ int NextAction::getAction(const vector<vector<double>> &sensor_fusion, double &r
 
       ref_vel = max_vel;
       
-      if(car_speed >= 43.0) { //++change_loop_counter > loop_size){
-        lane = std::min(lane + 1, 2);
+      //if(car_speed >= 43.0) { //++change_loop_counter > loop_size){
+        
 
         if((car_d < (2+4*lane+0.25)) && (car_d > (2+4*lane-0.25))){
           next_state = LANE_CLEAR;
-        } else {
-          next_state = FOLLOW;
-        }
+        } //else {
+          //next_state = FOLLOW;
+        //}
 
         left_ma.emptyQueue();
         right_ma.emptyQueue();
         current_ma.emptyQueue();
-      }
+      //}
       
       //cout << "CHANGE_RIGHT" << endl;
       break;
@@ -667,9 +667,18 @@ void NextAction::prepLaneChangeState(const vector<vector<double>> &sensor_fusion
       } else if((d < (2+4*lane_left+2)) && (d > (2+4*lane_left-2))){
         // check if the object is in the left lane
         left_lane_cost += cost;
+        
+        // check if there is a merge gap
+        if((check_car_s > car_s-15) && (check_car_s - car_s < 20)){
+          is_gap_left = false;
+        }
       } else if((d < (2+4*lane_right+2)) && (d > (2+4*lane_right-2))){
         // check if the object is in the right lane
         right_lane_cost += cost;
+        // check if there is a merge gap
+        if((check_car_s > car_s-15) && (check_car_s - car_s < 20)){
+          is_gap_right = false;
+        }
       } 
     }
   }
@@ -679,12 +688,14 @@ void NextAction::prepLaneChangeState(const vector<vector<double>> &sensor_fusion
   current_lane_cost = current_ma.nextAverage(current_lane_cost);
 
   if(left_ma.getSize() == filter_size){
-    if((left_lane_cost <= right_lane_cost) && (left_lane_cost < current_lane_cost)){
+    if(is_gap_left && (left_lane_cost <= right_lane_cost) && (left_lane_cost < current_lane_cost)){
       // TODO: call change lane left state
       next_state = CHANGE_LEFT;
-    } else if((right_lane_cost < left_lane_cost) && (right_lane_cost < current_lane_cost)){
+      lane = std::max(lane - 1, 0);
+    } else if(is_gap_right && (right_lane_cost < left_lane_cost) && (right_lane_cost < current_lane_cost)){
       // TODO: call change lane right state
       next_state = CHANGE_RIGHT;
+      lane = std::min(lane + 1, 2);
     }
     //cout << "Lane " << lane << "   L " << left_lane_cost << "  C " << current_lane_cost << "  R " << right_lane_cost << endl;
   }
@@ -776,9 +787,9 @@ int main() {
           	json msgJson;
             
             int prev_size = previous_path_x.size(); 
-            /*if((state == FOLLOW) && (prev_size > 20)) { // || (state == CHANGE_RIGHT) || (state == CHANGE_LEFT)
+            if((state == FOLLOW) && (prev_size > 20)) { // || (state == CHANGE_RIGHT) || (state == CHANGE_LEFT)
               prev_size = 20;
-            }*/
+            }
 
             if(prev_size > 0){
               car_s = end_path_s;
