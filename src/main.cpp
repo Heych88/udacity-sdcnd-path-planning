@@ -758,77 +758,69 @@ int main() {
     //auto sdata = string(data).substr(0, length);
     //cout << sdata << endl;
     if (length && length > 2 && data[0] == '4' && data[1] == '2') {
-
       auto s = hasData(data);
 
       if (s != "") {
         auto j = json::parse(s);
-        
         string event = j[0].get<string>();
         
         if (event == "telemetry") {
           // j[1] is the data JSON object
-          
-        	// Main car's localization Data
-          	double car_x = j[1]["x"];
-          	double car_y = j[1]["y"];
-          	double car_s = j[1]["s"];
-          	double car_d = j[1]["d"];
-          	double car_yaw = j[1]["yaw"];
-          	double car_speed = j[1]["speed"];
+          // Main car's localization Data
+          double car_x = j[1]["x"];
+          double car_y = j[1]["y"];
+          double car_s = j[1]["s"];
+          double car_d = j[1]["d"];
+          double car_yaw = j[1]["yaw"];
+          double car_speed = j[1]["speed"];
 
-          	// Previous path data given to the Planner
-          	auto previous_path_x = j[1]["previous_path_x"];
-          	auto previous_path_y = j[1]["previous_path_y"];
-          	// Previous path's end s and d values 
-          	double end_path_s = j[1]["end_path_s"];
-          	double end_path_d = j[1]["end_path_d"];
+          // Previous path data given to the Planner
+          auto previous_path_x = j[1]["previous_path_x"];
+          auto previous_path_y = j[1]["previous_path_y"];
+          // Previous path's end s and d values 
+          double end_path_s = j[1]["end_path_s"];
+          double end_path_d = j[1]["end_path_d"];
 
-          	// Sensor Fusion Data, a list of all other cars on the same side of the road.
-          	auto sensor_fusion = j[1]["sensor_fusion"];
+          // Sensor Fusion Data, a list of all other cars on the same side of the road.
+          auto sensor_fusion = j[1]["sensor_fusion"];
 
-          	json msgJson;
-            
-            int prev_size = previous_path_x.size(); 
-            if((state == FOLLOW) && (prev_size > 20)) { // || (state == CHANGE_RIGHT) || (state == CHANGE_LEFT)
+          json msgJson;
+
+          int prev_size = previous_path_x.size(); 
+          if(prev_size > 0){
+            car_s = end_path_s;
+         
+            if((prev_size > 20)) { //(state == FOLLOW) &&  || (state == CHANGE_RIGHT) || (state == CHANGE_LEFT)
               prev_size = 20;
             }
+          }
 
-            if(prev_size > 0){
-              car_s = end_path_s;
-            }
+          bool too_close = false;
 
-            //ref_vel = 49.5;
-            //int lane = car_d / 4;   
-            bool too_close = false;
-            
-            action.setVehicleVariables(car_s, car_d, car_speed, prev_size);
-            int lane = action.getAction(sensor_fusion, ref_vel, too_close, state);
-            
-            
-            Trajectory car_tj(car_x, car_y, car_yaw, car_s, lane, previous_path_x, previous_path_y, car_speed, prev_size);
-            car_tj.startPoints();
+          action.setVehicleVariables(car_s, car_d, car_speed, prev_size);
+          int lane = action.getAction(sensor_fusion, ref_vel, too_close, state);
 
-            car_tj.makeSplinePts(map_waypoints_s, map_waypoints_x, map_waypoints_y);
- 
-          	vector<double> next_x_vals;
-          	vector<double> next_y_vals;
- 
-            // create a function that intersects all points on the desired path
-            //tk::spline f_spline;
-            car_tj.getSpline();
-            //f_spline.set_points(ptsx, ptsy);
+          Trajectory car_tj(car_x, car_y, car_yaw, car_s, lane, previous_path_x, previous_path_y, car_speed, prev_size);
+          car_tj.startPoints();
 
-            car_tj.getTrajectoryPts(next_x_vals, next_y_vals, ref_vel, too_close);
-            
-          	// TODO: define a path made up of (x,y) points that the car will visit sequentially every .02 seconds
-          	msgJson["next_x"] = next_x_vals;
-          	msgJson["next_y"] = next_y_vals;
+          car_tj.makeSplinePts(map_waypoints_s, map_waypoints_x, map_waypoints_y);
 
-          	auto msg = "42[\"control\","+ msgJson.dump()+"]";
+          vector<double> next_x_vals;
+          vector<double> next_y_vals;
 
-          	//this_thread::sleep_for(chrono::milliseconds(1000));
-          	ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
+          // create a function that intersects all points on the desired path
+          car_tj.getSpline();
+
+          car_tj.getTrajectoryPts(next_x_vals, next_y_vals, ref_vel, too_close);
+
+          // TODO: define a path made up of (x,y) points that the car will visit sequentially every .02 seconds
+          msgJson["next_x"] = next_x_vals;
+          msgJson["next_y"] = next_y_vals;
+
+          auto msg = "42[\"control\","+ msgJson.dump()+"]";
+
+          //this_thread::sleep_for(chrono::milliseconds(1000));
+          ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
           
         }
       } else {
