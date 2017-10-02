@@ -493,33 +493,35 @@ void NextAction::setVehicleVariables(const double s_car, const double d_car, con
   is_gap_right = true;
   change_lane = false;
   //too_close = false;
+  
+  left_lane_cost = 0;
+  right_lane_cost = 0;
+  current_lane_cost = 0;
 
   if(lane == 0){
     is_gap_left = false;
+    left_lane_cost = 10000;
   } else if(lane == 2){
     is_gap_right = false;
+    right_lane_cost = 10000;
   }
   
   // clear the vehicle struct values
   center_front.distance_s = 1000;
   center_front.speed = 1000;
-  
   left_front.distance_s = 1000;
   left_front.speed = 1000;
-  
   right_front.distance_s = 1000;
   right_front.speed = 1000;
-  
   left_back.distance_s = 1000;
   left_back.speed = 1000;
-  
   right_back.distance_s = 1000;
   right_back.speed = 1000;
 }
 
 void NextAction::checkSurrounding(const vector<vector<double>> &sensor_fusion)
 {
-  
+
   for(int i=0; i < sensor_fusion.size(); i++){
     // car is in my lane
     float d = sensor_fusion[i][6];
@@ -592,16 +594,6 @@ int NextAction::getAction(const vector<vector<double>> &sensor_fusion, double &r
       //cout << "LANE_CLEAR " << endl;
       break;
     case(PREP_CHANGE_LANE):
-      left_lane_cost = 0;
-      right_lane_cost = 0;
-      current_lane_cost = 0;
-
-      if(lane == 0){
-        left_lane_cost = 10000;
-      } else if(lane == 2){
-        right_lane_cost = 10000;
-      }
-      
       NextAction::checkSurrounding(sensor_fusion);
       
       if(center_front.distance_s < follow_dist){
