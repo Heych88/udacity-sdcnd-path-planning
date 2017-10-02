@@ -432,7 +432,7 @@ private:
   double car_s, car_d, car_speed, max_vel, relative_vel_cost, max_vel_cost, s_cost;
   int lane, lane_left, lane_right, prev_size, next_state, filter_size;
   bool is_gap_left, is_gap_right, change_lane, is_new_state;//, too_close;
-  double left_lane_cost, right_lane_cost, current_lane_cost, look_ahead_dist;
+  double left_lane_cost, right_lane_cost, current_lane_cost, look_ahead_dist, action_ahead_dist, look_behind_dist, action_behind_dist, follow_dist;
   
   MovingAverage left_ma, right_ma, current_ma;
 };
@@ -447,7 +447,11 @@ NextAction::NextAction(const double max_speed)
   max_vel = max_speed;
   lane = -1;
 
-  look_ahead_dist = 40.0;
+  look_ahead_dist = 60.0;
+  action_ahead_dist = 40.0;
+  look_behind_dist = 20.0;
+  action_behind_dist = 15.0;
+  follow_dist = 20.0;
   
   relative_vel_cost = 1; // cost off difference between this vehicle and the object
   max_vel_cost = 1; // cost between the speed limit and the object
@@ -511,11 +515,10 @@ int NextAction::getAction(const vector<vector<double>> &sensor_fusion, double &r
         //check_car_s += prev_size * 0.02 * object_speed;
 
         // Check if there is a vehicle in front and in same lane 
-        if((d < (2+4*lane+1.8)) && (d > (2+4*lane-1.8)) && (check_car_s > car_s) && (check_car_s - car_s < look_ahead_dist)){                
+        if((d < (2+4*lane+1.8)) && (d > (2+4*lane-1.8)) && (check_car_s > car_s) && (check_car_s - car_s < action_ahead_dist)){                
           // only change the next state if we haven't changed it already
           next_state = PREP_CHANGE_LANE;
           is_new_state = true;
-          //cout << (1 - std::abs(car_s - check_car_s) / look_ahead_dist) << endl;
           break;
         } 
       }
@@ -551,7 +554,7 @@ int NextAction::getAction(const vector<vector<double>> &sensor_fusion, double &r
         // lane to the left, right and same lane as travel
         //if((check_car_s > car_s-15) && (check_car_s - car_s < 40) && d < (2+4*lane_right+1.8) && d > (2+4*lane_left-1.8)){
         
-        if((d < (2+4*lane+1.8)) && (d > (2+4*lane-1.8)) && (check_car_s > car_s) && (check_car_s - car_s < 25)){
+        if((d < (2+4*lane+1.8)) && (d > (2+4*lane-1.8)) && (check_car_s > car_s) && (check_car_s - car_s < follow_dist)){
           if(!is_new_state){
             next_state = PREP_CHANGE_LANE;
             is_new_state = true;
@@ -638,9 +641,9 @@ void NextAction::prepLaneChangeState(const vector<vector<double>> &sensor_fusion
     double vy = sensor_fusion[i][4];
     double object_speed = sqrt(vx*vx + vy*vy);
 
-    // only look at objects 15m behind and look_ahead_dist in front that are in the 
+    // only look at objects 15m behind and take action distance action_ahead_dist in front that are in the 
     // lane to the left, right and same lane as travel
-    if((d > (2+4*lane_left-1.8)) && (d < (2+4*lane_right+1.8)) && (check_car_s > car_s-18) && (check_car_s - car_s < look_ahead_dist)){
+    if((d > (2+4*lane_left-1.8)) && (d < (2+4*lane_right+1.8)) && (check_car_s > car_s-look_behind_dist) && (check_car_s - car_s < look_ahead_dist)){
 
       // velocity cost between this vehicle and the object speed
       double cost = std::abs(car_speed - object_speed) * relative_vel_cost;
@@ -655,7 +658,7 @@ void NextAction::prepLaneChangeState(const vector<vector<double>> &sensor_fusion
       if((d < (2+4*lane+1.8)) && (d > (2+4*lane-1.8)) && (check_car_s > car_s)){   
         current_lane_cost += cost;
 
-        if(check_car_s - car_s < 25){
+        if(check_car_s - car_s < follow_dist){
           // only change the next state if a lane change has not yet to been set
           //if(next_state == PREP_CHANGE_LANE){
             next_state = FOLLOW;
@@ -669,14 +672,14 @@ void NextAction::prepLaneChangeState(const vector<vector<double>> &sensor_fusion
         left_lane_cost += cost;
         
         // check if there is a merge gap
-        if((check_car_s > car_s-15) && (check_car_s - car_s < 20)){
+        if((check_car_s > car_s-action_behind_dist) && (check_car_s - car_s < follow_dist)){
           is_gap_left = false;
         }
       } else if((d < (2+4*lane_right+2)) && (d > (2+4*lane_right-2))){
         // check if the object is in the right lane
         right_lane_cost += cost;
         // check if there is a merge gap
-        if((check_car_s > car_s-15) && (check_car_s - car_s < 20)){
+        if((check_car_s > car_s-action_behind_dist) && (check_car_s - car_s < follow_dist)){
           is_gap_right = false;
         }
       } 
