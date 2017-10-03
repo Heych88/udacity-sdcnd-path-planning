@@ -16,22 +16,33 @@ private:
     int queue_size;
     int sum;
 public:
-  /** Initialize your data structure here. */
+  /*
+   * Initialize your data structure here. 
+   */
   MovingAverage() 
   {
      sum = 0;
   }
 
+  /*
+   * Set the size of the queue
+   */
   void setSize(const int size)
   {
     queue_size = size;
   }
   
+  /*
+   * Returns the size of the queue
+   */
   int getSize()
   {
     return q.size();
   }
   
+  /*
+   * Empties the elements from the queue
+   */
   void emptyQueue()
   {
     while (!q.empty())
@@ -41,6 +52,11 @@ public:
     sum = 0;
   }
 
+  /*
+   * Add new values to the queue and calculates the moving average of the queue
+   * @param val, latest value to be added to the queue
+   * @return the average value of the queue
+   */
   double nextAverage(const int val) 
   {
     if(q.size() < queue_size)
