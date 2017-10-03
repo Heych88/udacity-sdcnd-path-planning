@@ -20,31 +20,62 @@ using namespace std;
 
 class Trajectory {
 public:
-  Trajectory(const double x_car, const double y_car, const double yaw_car, const double s_car, const double drive_lane, vector<double> prev_path_x, vector<double> prev_path_y, const double speed_car, const int path_size);
-  virtual ~Trajectory();
-  //constexpr double pi() { return M_PI; }
+  // class initialiser 
+  Trajectory(const double x_car, const double y_car, const double yaw_car, 
+          const double s_car, const double drive_lane, const vector<double> prev_path_x, 
+          const vector<double> prev_path_y, const double speed_car, const int path_size);
+  
+  // destructor
+  virtual ~Trajectory();    
+  
+  // Converts degrees to radians
   double deg2rad(double x);
+  
+  // Converts radians to degrees
   double rad2deg(double x);
+  
+  // Calculates the Euclidean distance between x and y coordinate points
   double distance(double x1, double y1, double x2, double y2);
+  
+  // Finds the closest map way point to the current vehicle position
   int ClosestWaypoint(double x, double y, const vector<double> &maps_x, const vector<double> &maps_y);
+  
+  // finds the next map way point  from the current way point
   int NextWaypoint(double x, double y, double theta, const vector<double> &maps_x, const vector<double> &maps_y);
+  
+  // Converts the map x & y points into Frenet coordinate points
   vector<double> getFrenet(double x, double y, double theta, const vector<double> &maps_x, const vector<double> &maps_y);
+  
+  // Converts the map Frenet coordinate points into x & y points
   vector<double> getXY(double s, double d, const vector<double> &maps_s, const vector<double> &maps_x, const vector<double> &maps_y);
+  
+  // Initialise  the start trajectory points dependent on previous path data
   void startPoints();
-  void makeSplinePts(vector<double> map_waypoints_s, vector<double> map_waypoints_x, vector<double> map_waypoints_y);
+  
+  // Transform and convert the spline path into vehicle centric coordinates  
+  void makeSplinePts(const vector<double> map_waypoints_s, const vector<double> map_waypoints_x, const vector<double> map_waypoints_y);
+  
+  // create a function that intersects all points on the desired path
   void getSpline();
+  
+  // returns the splines y value for a set step 
   double solveSpline(const double x);
+  
+  // Creates the final step trajectory path points
   void getTrajectoryPts(vector<double> &next_x_vals, vector<double> &next_y_vals, const double ref_vel, const bool too_close);
   
 private:
-  int prev_size;
+  int prev_size; // size of the previous trajectory points 
   double max_vel;
-  tk::spline f_spline;
+  tk::spline f_spline; // spline maths function variable
+
   double car_x, car_y, car_yaw, car_s, lane, car_speed, global_x, global_y, global_yaw;
   vector<double> previous_path_x, previous_path_y, ptsx, ptsy;
 };
 
-Trajectory::Trajectory(const double x_car, const double y_car, const double yaw_car, const double s_car, const double drive_lane, vector<double> prev_path_x, vector<double> prev_path_y, const double speed_car, const int path_size)
+Trajectory::Trajectory(const double x_car, const double y_car, const double yaw_car, 
+        const double s_car, const double drive_lane, const vector<double> prev_path_x, 
+        const vector<double> prev_path_y, const double speed_car, const int path_size)
 {
   car_x = x_car;
   max_vel = 49.0;
@@ -232,7 +263,8 @@ void Trajectory::startPoints(){
   }
 }
 
-void Trajectory::makeSplinePts(vector<double> map_waypoints_s, vector<double> map_waypoints_x, vector<double> map_waypoints_y) {
+void Trajectory::makeSplinePts(const vector<double> map_waypoints_s, const vector<double> map_waypoints_x, const vector<double> map_waypoints_y) {
+  
   // Frenet coordinates are referenced from the center yellow lines and positive d being on the right.
   double next_d = 2 + 4 * lane; //calculate the cars center d position based on the desired lane
   // get select way points in the future to predict a spline functions for the desired path  
