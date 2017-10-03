@@ -461,13 +461,13 @@ void Trajectory::getStep(double &step, const double ref_vel, const bool too_clos
   y_local = Trajectory::solveSpline(x_local);
   
   // FIXME: fix velocity step check below as it causes excessive jerk on back part of track
-  /*double diff_x = x_local - prev_x_local;
+  double diff_x = x_local - prev_x_local;
   double diff_y = y_local - prev_y_local;
   double diff_step = sqrt(diff_x*diff_x + diff_y*diff_y);
   int loop = 0;
 
   while(diff_step > max_step && loop < 5){
-    double error = max_step/diff_step;
+    double error = std::max(max_step/diff_step, 0.99);
 
     x_local *= error; // decrease the x_step by the error amount
     y_local = Trajectory::solveSpline(x_local);
@@ -476,12 +476,12 @@ void Trajectory::getStep(double &step, const double ref_vel, const bool too_clos
     diff_y = y_local - prev_y_local;
     diff_step = sqrt(diff_x*diff_x + diff_y*diff_y);
 
-    //cout << "loop " << loop << "  error " << error << "  diff_x " << diff_x << "  diff_y " << diff_y << "  diff_step " << diff_step << endl;
+    cout << "loop " << loop << "  error " << error << "  diff_x " << diff_x << "  diff_y " << diff_y << "  diff_step " << diff_step << endl;
     loop++;
   }
 
   prev_x_local = x_local; // update the previous step points
-  prev_y_local = y_local;*/
+  prev_y_local = y_local;
 }
 
 #endif /* TRAJECTORY_H */
