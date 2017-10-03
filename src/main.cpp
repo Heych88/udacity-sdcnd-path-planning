@@ -455,9 +455,9 @@ NextAction::NextAction(const double max_speed)
   lane = -1;
 
   look_ahead_dist = 60.0;
-  action_ahead_dist = 40.0;
-  look_behind_dist = 40.0;
-  action_behind_dist = 25.0;
+  action_ahead_dist = 50.0;
+  look_behind_dist = 20.0;
+  action_behind_dist = 10.0;
   follow_dist = 20.0;
   
   relative_vel_cost = 1; // cost off difference between this vehicle and the object
@@ -530,23 +530,26 @@ void NextAction::checkSurrounding(const vector<vector<double>> &sensor_fusion)
     double vy = sensor_fusion[i][4];
     double object_speed = sqrt(vx*vx + vy*vy);
     
-    double distance_s = check_car_s - car_s;
+    // add an offset to counter the sensor offset produced in the simulator which  
+    // predicts the vehicles position 15m ahead of the actual vehicles position.
+    double sensor_offset = 15.5;
+    double distance_s = check_car_s - car_s + sensor_offset; 
 
     // only look at objects 15m behind and take action distance action_ahead_dist in front that are in the 
     // lane to the left, right and same lane as travel
-    if((d > (2+4*lane_left-1.8)) && (d < (2+4*lane_right+1.8)) && (check_car_s > car_s-look_behind_dist) && (distance_s < look_ahead_dist)){
+    if((d > (2+4*lane_left-1.8)) && (d < (2+4*lane_right+1.8)) && (distance_s > -look_behind_dist) && (distance_s < look_ahead_dist)){ //(check_car_s > car_s-look_behind_dist)
 
       // velocity cost between this vehicle and the object speed
       double cost = std::abs(car_speed - object_speed) * relative_vel_cost;
       // velocity cost between the speed limit and the objects speed
       cost += std::abs(max_vel - object_speed) * max_vel_cost;
       // cost for the distance between this vehicle and the object 
-      cost += (1 - std::abs(car_s - check_car_s) / look_ahead_dist) * s_cost;
+      cost += (1 - std::abs(distance_s) / look_ahead_dist) * s_cost;
       // cost for the distance between this vehicle and the object 1 second in the future
-      cost += (std::abs((car_s + car_speed) - (check_car_s + object_speed)) / look_ahead_dist) * s_cost;
+      cost += (std::abs((check_car_s + object_speed) - (car_s + car_speed) + sensor_offset) / look_ahead_dist) * s_cost;
       
       // Check if there is a vehicle in front and in same lane 
-      if((d < (2+4*lane+1.8)) && (d > (2+4*lane-1.8)) && (check_car_s > car_s)){  
+      if((d < (2+4*lane+1.8)) && (d > (2+4*lane-1.8)) && (distance_s > 0)){  
         current_lane_cost += cost;
         
         if(center_front.distance_s > distance_s){
@@ -555,7 +558,7 @@ void NextAction::checkSurrounding(const vector<vector<double>> &sensor_fusion)
         }
       } else if((d < (2+4*lane_left+2)) && (d > (2+4*lane_left-2))){
         // check if the object is in the left lane
-        if(check_car_s > car_s) {
+        if(distance_s > 0) {
           left_lane_cost += cost;
           if(left_front.distance_s > distance_s){
             left_front.distance_s = distance_s;
@@ -570,12 +573,12 @@ void NextAction::checkSurrounding(const vector<vector<double>> &sensor_fusion)
         }
         
         // check if there is a merge gap
-        if((check_car_s > car_s-action_behind_dist) && (distance_s < follow_dist)){
+        if((distance_s > -action_behind_dist) && (distance_s < follow_dist)){
           is_gap_left = false;
         }
       } else if((d < (2+4*lane_right+2)) && (d > (2+4*lane_right-2))){
         // check if the object is in the right lane
-        if(check_car_s > car_s) {
+        if(distance_s > 0) {
           right_lane_cost += cost;
           if(right_front.distance_s > distance_s){
             right_front.distance_s = distance_s;
@@ -590,7 +593,7 @@ void NextAction::checkSurrounding(const vector<vector<double>> &sensor_fusion)
         }
         
         // check if there is a merge gap
-        if((check_car_s > car_s-action_behind_dist) && (distance_s < follow_dist)){
+        if((distance_s > -action_behind_dist) && (distance_s < follow_dist)){
           is_gap_right = false;
         }
       } 
@@ -615,7 +618,6 @@ int NextAction::getAction(const vector<vector<double>> &sensor_fusion, double &r
         next_state = PREP_CHANGE_LANE;
       } 
 
-      //cout << "LANE_CLEAR " << center_front.distance_s << endl;
       //cout << "LANE_CLEAR " << endl;
       break;
     case(PREP_CHANGE_LANE):
@@ -644,7 +646,7 @@ int NextAction::getAction(const vector<vector<double>> &sensor_fusion, double &r
         //cout << "Lane " << lane << "   L " << left_lane_cost << "  C " << current_lane_cost << "  R " << right_lane_cost << endl;
       }
       
-      cout << "left: " << left_back.distance_s << "  right: " << right_back.distance_s << endl;
+      //cout << "left: " << left_back.distance_s << "  center: " << center_front.distance_s << "  right: " << right_back.distance_s << endl;
       
       //cout << "PREP_CHANGE_LANE " << endl;
       break;
@@ -680,8 +682,6 @@ int NextAction::getAction(const vector<vector<double>> &sensor_fusion, double &r
 
       ref_vel = max_vel;
       
-      cout << "left: " << left_back.distance_s << "  right: " << right_back.distance_s << endl;
-      
       //if(car_speed >= 43.0) { //++change_loop_counter > loop_size){
         
 
@@ -701,8 +701,6 @@ int NextAction::getAction(const vector<vector<double>> &sensor_fusion, double &r
     case(CHANGE_RIGHT):
 
       ref_vel = max_vel;
-      
-      cout << "left: " << left_back.distance_s << "  right: " << right_back.distance_s << endl;
       
       //if(car_speed >= 43.0) { //++change_loop_counter > loop_size){
         
