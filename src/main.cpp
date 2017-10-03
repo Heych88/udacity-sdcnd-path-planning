@@ -456,8 +456,8 @@ NextAction::NextAction(const double max_speed)
 
   look_ahead_dist = 60.0;
   action_ahead_dist = 40.0;
-  look_behind_dist = 20.0;
-  action_behind_dist = 15.0;
+  look_behind_dist = 40.0;
+  action_behind_dist = 25.0;
   follow_dist = 20.0;
   
   relative_vel_cost = 1; // cost off difference between this vehicle and the object
@@ -493,7 +493,7 @@ void NextAction::setVehicleVariables(const double s_car, const double d_car, con
   is_gap_right = true;
   change_lane = false;
   //too_close = false;
-  
+
   left_lane_cost = 0;
   right_lane_cost = 0;
   current_lane_cost = 0;
@@ -504,7 +504,7 @@ void NextAction::setVehicleVariables(const double s_car, const double d_car, con
   } else if(lane == 2){
     is_gap_right = false;
     right_lane_cost = 10000;
-  }
+  } 
   
   // clear the vehicle struct values
   center_front.distance_s = 1000;
@@ -513,9 +513,9 @@ void NextAction::setVehicleVariables(const double s_car, const double d_car, con
   left_front.speed = 1000;
   right_front.distance_s = 1000;
   right_front.speed = 1000;
-  left_back.distance_s = 1000;
+  left_back.distance_s = -1000;
   left_back.speed = 1000;
-  right_back.distance_s = 1000;
+  right_back.distance_s = -1000;
   right_back.speed = 1000;
 }
 
@@ -555,7 +555,19 @@ void NextAction::checkSurrounding(const vector<vector<double>> &sensor_fusion)
         }
       } else if((d < (2+4*lane_left+2)) && (d > (2+4*lane_left-2))){
         // check if the object is in the left lane
-        left_lane_cost += cost;
+        if(check_car_s > car_s) {
+          left_lane_cost += cost;
+          if(left_front.distance_s > distance_s){
+            left_front.distance_s = distance_s;
+            left_front.speed = object_speed;
+          }
+        } else {
+          left_lane_cost += cost;
+          if(left_back.distance_s < distance_s){
+            left_back.distance_s = distance_s;
+            left_back.speed = object_speed;
+          }
+        }
         
         // check if there is a merge gap
         if((check_car_s > car_s-action_behind_dist) && (distance_s < follow_dist)){
@@ -563,7 +575,20 @@ void NextAction::checkSurrounding(const vector<vector<double>> &sensor_fusion)
         }
       } else if((d < (2+4*lane_right+2)) && (d > (2+4*lane_right-2))){
         // check if the object is in the right lane
-        right_lane_cost += cost;
+        if(check_car_s > car_s) {
+          right_lane_cost += cost;
+          if(right_front.distance_s > distance_s){
+            right_front.distance_s = distance_s;
+            right_front.speed = object_speed;
+          }
+        } else {
+          left_lane_cost += cost;
+          if(right_back.distance_s < distance_s){
+            right_back.distance_s = distance_s;
+            right_back.speed = object_speed;
+          }
+        }
+        
         // check if there is a merge gap
         if((check_car_s > car_s-action_behind_dist) && (distance_s < follow_dist)){
           is_gap_right = false;
@@ -619,6 +644,8 @@ int NextAction::getAction(const vector<vector<double>> &sensor_fusion, double &r
         //cout << "Lane " << lane << "   L " << left_lane_cost << "  C " << current_lane_cost << "  R " << right_lane_cost << endl;
       }
       
+      cout << "left: " << left_back.distance_s << "  right: " << right_back.distance_s << endl;
+      
       //cout << "PREP_CHANGE_LANE " << endl;
       break;
     case(FOLLOW):
@@ -653,6 +680,8 @@ int NextAction::getAction(const vector<vector<double>> &sensor_fusion, double &r
 
       ref_vel = max_vel;
       
+      cout << "left: " << left_back.distance_s << "  right: " << right_back.distance_s << endl;
+      
       //if(car_speed >= 43.0) { //++change_loop_counter > loop_size){
         
 
@@ -672,6 +701,8 @@ int NextAction::getAction(const vector<vector<double>> &sensor_fusion, double &r
     case(CHANGE_RIGHT):
 
       ref_vel = max_vel;
+      
+      cout << "left: " << left_back.distance_s << "  right: " << right_back.distance_s << endl;
       
       //if(car_speed >= 43.0) { //++change_loop_counter > loop_size){
         
