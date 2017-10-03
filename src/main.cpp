@@ -432,7 +432,8 @@ private:
   double car_s, car_d, car_speed, max_vel, relative_vel_cost, max_vel_cost, s_cost;
   int lane, lane_left, lane_right, prev_size, next_state, filter_size;
   bool is_gap_left, is_gap_right, change_lane, is_new_state;//, too_close;
-  double left_lane_cost, right_lane_cost, current_lane_cost, look_ahead_dist, action_ahead_dist, look_behind_dist, action_behind_dist, follow_dist;
+  double left_front_cost, right_front_cost, left_back_cost, right_back_cost, current_lane_cost; 
+  double look_ahead_dist, action_ahead_dist, look_behind_dist, action_behind_dist, follow_dist;
   
   struct vehicle {
     double distance_s;
@@ -494,16 +495,21 @@ void NextAction::setVehicleVariables(const double s_car, const double d_car, con
   change_lane = false;
   //too_close = false;
 
-  left_lane_cost = 0;
-  right_lane_cost = 0;
+  left_front_cost = 0;
+  left_back_cost = 0;
   current_lane_cost = 0;
+  right_front_cost = 0;
+  right_back_cost = 0;
+  
 
   if(lane == 0){
     is_gap_left = false;
-    left_lane_cost = 10000;
+    left_front_cost = 10000;
+    left_back_cost = 10000;
   } else if(lane == 2){
     is_gap_right = false;
-    right_lane_cost = 10000;
+    right_front_cost = 10000;
+    right_back_cost = 10000;
   } 
   
   // clear the vehicle struct values
@@ -559,13 +565,13 @@ void NextAction::checkSurrounding(const vector<vector<double>> &sensor_fusion)
       } else if((d < (2+4*lane_left+2)) && (d > (2+4*lane_left-2))){
         // check if the object is in the left lane
         if(distance_s > 0) {
-          left_lane_cost += cost;
+          left_front_cost += cost;
           if(left_front.distance_s > distance_s){
             left_front.distance_s = distance_s;
             left_front.speed = object_speed;
           }
         } else {
-          left_lane_cost += cost;
+          left_back_cost += cost;
           if(left_back.distance_s < distance_s){
             left_back.distance_s = distance_s;
             left_back.speed = object_speed;
@@ -579,13 +585,13 @@ void NextAction::checkSurrounding(const vector<vector<double>> &sensor_fusion)
       } else if((d < (2+4*lane_right+2)) && (d > (2+4*lane_right-2))){
         // check if the object is in the right lane
         if(distance_s > 0) {
-          right_lane_cost += cost;
+          right_front_cost += cost;
           if(right_front.distance_s > distance_s){
             right_front.distance_s = distance_s;
             right_front.speed = object_speed;
           }
         } else {
-          left_lane_cost += cost;
+          right_back_cost += cost;
           if(right_back.distance_s < distance_s){
             right_back.distance_s = distance_s;
             right_back.speed = object_speed;
@@ -606,6 +612,8 @@ int NextAction::getAction(const vector<vector<double>> &sensor_fusion, double &r
   
   next_state = state;
   is_new_state = false;
+  
+  double left_cost, right_cost;
 
   switch(state){
     case(LANE_CLEAR):
@@ -629,21 +637,21 @@ int NextAction::getAction(const vector<vector<double>> &sensor_fusion, double &r
         next_state = LANE_CLEAR;
       }
       
-      left_lane_cost = left_ma.nextAverage(left_lane_cost);
-      right_lane_cost = right_ma.nextAverage(right_lane_cost);
+      left_cost = left_ma.nextAverage(left_front_cost);
+      right_cost = right_ma.nextAverage(right_front_cost);
       current_lane_cost = current_ma.nextAverage(current_lane_cost);
 
       if(left_ma.getSize() == filter_size){
-        if(is_gap_left && (left_lane_cost <= right_lane_cost) && (left_lane_cost < current_lane_cost)){
+        if(is_gap_left && (left_cost <= right_cost) && (left_cost < current_lane_cost)){
           // TODO: call change lane left state
           next_state = CHANGE_LEFT;
           lane = std::max(lane - 1, 0);
-        } else if(is_gap_right && (right_lane_cost < left_lane_cost) && (right_lane_cost < current_lane_cost)){
+        } else if(is_gap_right && (right_cost < left_cost) && (right_cost < current_lane_cost)){
           // TODO: call change lane right state
           next_state = CHANGE_RIGHT;
           lane = std::min(lane + 1, 2);
         }
-        //cout << "Lane " << lane << "   L " << left_lane_cost << "  C " << current_lane_cost << "  R " << right_lane_cost << endl;
+        //cout << "Lane " << lane << "   L " << left_cost << "  C " << current_lane_cost << "  R " << right_cost << endl;
       }
       
       //cout << "left: " << left_back.distance_s << "  center: " << center_front.distance_s << "  right: " << right_back.distance_s << endl;
