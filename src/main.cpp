@@ -428,6 +428,7 @@ public:
   void setVehicleVariables(const double s_car, const double d_car, const double speed_car, const int path_size);
   int getAction(const vector<vector<double>> &sensor_fusion, double &ref_vel, bool &too_close, int &state);
   void checkSurrounding(const vector<vector<double>> &sensor_fusion);
+  int getFollowSpeed(bool &too_close);
 private:
   double car_s, car_d, car_speed, max_vel, relative_vel_cost, max_vel_cost, s_cost;
   int lane, lane_left, lane_right, prev_size, next_state, filter_size;
@@ -607,6 +608,30 @@ void NextAction::checkSurrounding(const vector<vector<double>> &sensor_fusion)
   }
 }
 
+int NextAction::getFollowSpeed(bool &too_close)
+{
+  // slow down if the car in front is less than 20m ahead
+  too_close = true;
+  
+  double ref_vel;
+
+  //stop the car if the object in front is stopped or we are very close to it
+  if(((center_front.speed <= 0.3) && (center_front.distance_s < 5)) || (center_front.distance_s < 5)){
+    ref_vel = 0;
+  }
+
+  // TODO: add better maths to slow and follow the vehicle in front based of it's speed and distance
+  if(center_front.distance_s < 15){
+    ref_vel = center_front.speed/2; // slow down to increase the distance between the car in front
+  } else if(center_front.distance_s < 10){
+    ref_vel = center_front.speed/4; // slow a lot as we are too close to the car in front
+  } else {
+    ref_vel = center_front.speed; // slow down to the speed of the vehicle in front and follow it
+  }
+  
+  return ref_vel;
+}
+
 int NextAction::getAction(const vector<vector<double>> &sensor_fusion, double &ref_vel, bool &too_close, int &state)
 {
   
@@ -661,68 +686,50 @@ int NextAction::getAction(const vector<vector<double>> &sensor_fusion, double &r
     case(FOLLOW):
       NextAction::checkSurrounding(sensor_fusion);
       
-      if(center_front.distance_s < follow_dist){
+      if(center_front.distance_s < follow_dist) {
         next_state = PREP_CHANGE_LANE;
-        
-        // slow down if the car in front is less than 20m ahead
-        too_close = true;
 
-        //stop the car if the object in front is stopped or we are very close to it
-        if(((center_front.speed <= 0.3) && (center_front.distance_s < 5)) || (center_front.distance_s < 5)){
-          ref_vel = 0;
-        }
-        
-        // TODO: add better maths to slow and follow the vehicle in front based of it's speed and distance
-        if(center_front.distance_s < 15){
-          ref_vel = center_front.speed/2; // slow down to increase the distance between the car in front
-        } else if(center_front.distance_s < 10){
-          ref_vel = center_front.speed/4; // slow a lot as we are too close to the car in front
-        } else {
-          ref_vel = center_front.speed; // slow down to the speed of the vehicle in front and follow it
-        }
-        
+        ref_vel = NextAction::getFollowSpeed(too_close);
       } else {
         next_state = LANE_CLEAR;
       }
       //cout << "FOLLOW" << endl;
       break;
     case(CHANGE_LEFT):
-
-      ref_vel = max_vel;
+      NextAction::checkSurrounding(sensor_fusion);
       
-      //if(car_speed >= 43.0) { //++change_loop_counter > loop_size){
-        
+      if((center_front.distance_s < follow_dist) || (left_front.distance_s < follow_dist)) {
+        ref_vel = NextAction::getFollowSpeed(too_close);
+      } else {
+        ref_vel = max_vel;
+      }
+      
+      if((car_d < (2+4*lane+0.5)) && (car_d > (2+4*lane-0.5))){
+        next_state = LANE_CLEAR;
+      } 
 
-        if((car_d < (2+4*lane+0.5)) && (car_d > (2+4*lane-0.5))){
-          next_state = LANE_CLEAR;
-        } //else {
-          //next_state = FOLLOW;
-        //}
-
-        left_ma.emptyQueue();
-        right_ma.emptyQueue();
-        current_ma.emptyQueue();
-      //}
+      left_ma.emptyQueue();
+      right_ma.emptyQueue();
+      current_ma.emptyQueue();
       
       //cout << "CHANGE_LEFT" << endl;
       break;
     case(CHANGE_RIGHT):
-
-      ref_vel = max_vel;
+      NextAction::checkSurrounding(sensor_fusion);
       
-      //if(car_speed >= 43.0) { //++change_loop_counter > loop_size){
+      if((center_front.distance_s < follow_dist) || (right_front.distance_s < follow_dist)) {
+        ref_vel = NextAction::getFollowSpeed(too_close);
+      } else {
+        ref_vel = max_vel;
+      }
         
+      if((car_d < (2+4*lane+0.5)) && (car_d > (2+4*lane-0.5))){
+        next_state = LANE_CLEAR;
+      } 
 
-        if((car_d < (2+4*lane+0.25)) && (car_d > (2+4*lane-0.25))){
-          next_state = LANE_CLEAR;
-        } //else {
-          //next_state = FOLLOW;
-        //}
-
-        left_ma.emptyQueue();
-        right_ma.emptyQueue();
-        current_ma.emptyQueue();
-      //}
+      left_ma.emptyQueue();
+      right_ma.emptyQueue();
+      current_ma.emptyQueue();
       
       //cout << "CHANGE_RIGHT" << endl;
       break;
