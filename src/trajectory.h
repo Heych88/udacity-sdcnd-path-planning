@@ -8,17 +8,12 @@
 #ifndef TRAJECTORY_H
 #define TRAJECTORY_H
 
-#include <fstream>
 #include <math.h>
-//#include <uWS/uWS.h>
-//#include <chrono>
 #include <iostream>
-//#include <thread>
 #include <vector>
 #include <queue>
 #include "Eigen-3.3/Eigen/Core"
 #include "Eigen-3.3/Eigen/QR"
-//#include "json.hpp"
 #include "spline.h"
 
 using namespace std;
@@ -466,8 +461,9 @@ void Trajectory::getStep(double &step, const double ref_vel, const bool too_clos
   double diff_step = sqrt(diff_x*diff_x + diff_y*diff_y);
   int loop = 0;
 
-  while(diff_step > max_step && loop < 5){
-    double error = std::max(max_step/diff_step, 0.99);
+  // Check that the step will not exceed the max velocity step
+  while(diff_step > max_step && loop < 6){
+    double error = std::max(max_step/diff_step, 0.97);
 
     x_local *= error; // decrease the x_step by the error amount
     y_local = Trajectory::solveSpline(x_local);
@@ -476,7 +472,6 @@ void Trajectory::getStep(double &step, const double ref_vel, const bool too_clos
     diff_y = y_local - prev_y_local;
     diff_step = sqrt(diff_x*diff_x + diff_y*diff_y);
 
-    cout << "loop " << loop << "  error " << error << "  diff_x " << diff_x << "  diff_y " << diff_y << "  diff_step " << diff_step << endl;
     loop++;
   }
 

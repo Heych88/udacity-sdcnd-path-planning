@@ -14,21 +14,17 @@
 #ifndef PATHSTATES_H
 #define PATHSTATES_H
 
-#include <fstream>
 #include <math.h>
-#include <uWS/uWS.h>
-#include <chrono>
 #include <iostream>
-#include <thread>
 #include <vector>
 #include <queue>
 #include "Eigen-3.3/Eigen/Core"
 #include "Eigen-3.3/Eigen/QR"
-#include "json.hpp"
 #include "spline.h"
 #include "trajectory.h"
 #include "filter.h" // MovingAverage class
 
+// Finite State Machine states
 #define LANE_CLEAR 0
 #define PREP_CHANGE_LANE 1
 #define FOLLOW 2
@@ -62,10 +58,8 @@ private:
   double relative_vel_cost, max_vel_cost, s_cost; // cost values parameters
   int lane, lane_left, lane_right; // current and neighboring lane values
   int prev_size; // number of previous trajectory points to use
-  int next_state, filter_size; // Moving average filter size
+  int filter_size; // Moving average filter size
   bool is_gap_left, is_gap_right; // Store if there is a merge gap present (true) or not (false) 
-  bool change_lane; // DELETE
-  bool is_new_state; // DELETE
   // Total cost of all objects in a lane and there position in front or behind the vehicle  
   double left_front_cost, right_front_cost, left_back_cost, right_back_cost, current_lane_cost; 
   // Action and tracking distance parameters for sensor fusion data
@@ -92,7 +86,6 @@ NextAction::NextAction(const double max_speed)
   car_d = 0;
   car_speed = 0;
   prev_size = 0;
-  is_new_state = false;
   max_vel = max_speed;
   lane = -1;
 
@@ -146,7 +139,6 @@ void NextAction::setVehicleVariables(const double s_car, const double d_car, con
   // There is always a merge gap but will be cleared in the checkSurrounding function
   is_gap_left = true;
   is_gap_right = true;
-  change_lane = false;
 
   // Reset the total cost values
   left_front_cost = 0;
@@ -310,11 +302,7 @@ double NextAction::getFollowSpeed(bool &too_close)
  * @return updated lane number
  */
 int NextAction::getAction(const vector<vector<double>> &sensor_fusion, double &ref_vel, bool &too_close, int &state)
-{
-  
-  next_state = state;
-  is_new_state = false;
-  
+{  
   double left_cost, right_cost; // total left and right lane costs
 
   switch(state){
@@ -326,16 +314,16 @@ int NextAction::getAction(const vector<vector<double>> &sensor_fusion, double &r
       
       // Check if there is a vehicle in front and in same lane 
       if(center_front.distance_s < action_ahead_dist){               
-        next_state = PREP_CHANGE_LANE;
+        state = PREP_CHANGE_LANE;
       } 
       break;
     case(PREP_CHANGE_LANE):
       NextAction::checkSurrounding(sensor_fusion);
       
       if(center_front.distance_s < follow_dist){
-        next_state = FOLLOW;
-      } else if(!is_new_state){
-        next_state = LANE_CLEAR;
+        state = FOLLOW;
+      } else {
+        state = LANE_CLEAR;
       }
       
       // get the averaged cost of being in each lane
@@ -348,11 +336,11 @@ int NextAction::getAction(const vector<vector<double>> &sensor_fusion, double &r
         // Find the lane with the lowest cost and favour passing on the left 
         if(is_gap_left && (left_cost <= right_cost) && (left_cost < current_lane_cost)){
           // change lanes to the left
-          next_state = CHANGE_LEFT;
+          state = CHANGE_LEFT;
           lane = std::max(lane - 1, 0); 
         } else if(is_gap_right && (right_cost < left_cost) && (right_cost < current_lane_cost)){
           // change lanes to the right
-          next_state = CHANGE_RIGHT;
+          state = CHANGE_RIGHT;
           lane = std::min(lane + 1, 2);
         }
       }
@@ -362,11 +350,11 @@ int NextAction::getAction(const vector<vector<double>> &sensor_fusion, double &r
       
       // Check if the object in front is too close and slow down
       if(center_front.distance_s < follow_dist) {
-        next_state = PREP_CHANGE_LANE;
+        state = PREP_CHANGE_LANE;
 
         ref_vel = NextAction::getFollowSpeed(too_close);
       } else {
-        next_state = LANE_CLEAR;
+        state = LANE_CLEAR;
       }
       break;
     case(CHANGE_LEFT):
@@ -381,7 +369,7 @@ int NextAction::getAction(const vector<vector<double>> &sensor_fusion, double &r
       
       // only update the state if the vehicle is in the center of the lane
       if((car_d < (2+4*lane+0.5)) && (car_d > (2+4*lane-0.5))){
-        next_state = LANE_CLEAR;
+        state = LANE_CLEAR;
       } 
 
       // reset the moving average filter to start the new lane cost fresh
@@ -401,7 +389,7 @@ int NextAction::getAction(const vector<vector<double>> &sensor_fusion, double &r
         
       // only update the state if the vehicle is in the center of the lane
       if((car_d < (2+4*lane+0.5)) && (car_d > (2+4*lane-0.5))){
-        next_state = LANE_CLEAR;
+        state = LANE_CLEAR;
       } 
 
       left_ma.emptyQueue();
@@ -410,10 +398,10 @@ int NextAction::getAction(const vector<vector<double>> &sensor_fusion, double &r
       break;
     default:
       // Should never get in this state but reset to default state
-      next_state = LANE_CLEAR;
+      state = LANE_CLEAR;
   }
   
-  state = next_state; // set the state for the next time around
+  state = state; // set the state for the next time around
   
   return lane;
 }
