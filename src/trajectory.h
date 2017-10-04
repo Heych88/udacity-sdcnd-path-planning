@@ -71,6 +71,7 @@ public:
 private:
   int prev_size; // size of the previous trajectory points 
   double max_vel; // max allowed vehicle velocity
+  double waypoint_step; // distance between spline points
   tk::spline f_spline; // spline maths function variable
 
   double car_x, car_y, car_yaw, car_s, car_speed; // current vehicle parameters
@@ -111,6 +112,8 @@ Trajectory::Trajectory(const double x_car, const double y_car, const double yaw_
   previous_path_y = prev_path_y;
   car_speed = speed_car;
   prev_size = path_size;
+  
+  waypoint_step = 25;
 }
 
 Trajectory::~Trajectory() 
@@ -340,7 +343,7 @@ void Trajectory::makeSplinePts(const vector<double> map_waypoints_s, const vecto
   double next_d = 2 + 4 * lane; //calculate the cars center d position based on the desired lane
   // get select way points in the future to predict a spline functions for the desired path  
   for(int i=1; i <= 3; i++){
-    vector<double> xy_pts = Trajectory::getXY(car_s+(i*30), next_d, map_waypoints_s, map_waypoints_x, map_waypoints_y);
+    vector<double> xy_pts = Trajectory::getXY(car_s+(i*waypoint_step), next_d, map_waypoints_s, map_waypoints_x, map_waypoints_y);
 
     // convert these future points into car centric coordinates
     double shift_x = xy_pts[0] - global_x;
@@ -434,7 +437,7 @@ void Trajectory::getTrajectoryPts(vector<double> &next_x_vals, vector<double> &n
 void Trajectory::getStep(double &step, const double ref_vel, const bool too_close, 
         double &x_local, double &y_local, double &prev_x_local, double &prev_y_local)
 {
-  double acceleration = 0.003; // max allowed acceleration per step 8m/s^2
+  double acceleration = 0.0022; // max allowed acceleration per step 8m/s^2
   const double mile_ph_to_meter_ps = 1609.344 / 3600.0; // 1Mph * 1609.344meter/h / 3600 = 0.44704 m/s
   const double max_step = max_vel * mile_ph_to_meter_ps * 0.02;
   double ref_step = std::min<double>(ref_vel * mile_ph_to_meter_ps * 0.02, max_step);

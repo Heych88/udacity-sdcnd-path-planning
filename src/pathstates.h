@@ -53,9 +53,11 @@ private:
   int lane, lane_left, lane_right; // current and neighboring lane values
   int prev_size; // number of previous trajectory points to use
   int filter_size; // Moving average filter size
-  bool is_gap_left, is_gap_right; // Store if there is a merge gap present (true) or not (false) 
+  bool is_gap_left, is_gap_right; // Store if there is a merge gap present (true) or not (false)
+  
   // Total cost of all objects in a lane and there position in front or behind the vehicle  
   double left_front_cost, right_front_cost, left_back_cost, right_back_cost, current_lane_cost; 
+  
   // Action and tracking distance parameters for sensor fusion data
   double look_ahead_dist, action_ahead_dist, look_behind_dist, action_behind_dist, follow_dist;
   
@@ -85,9 +87,9 @@ NextAction::NextAction(const double max_speed)
 
   look_ahead_dist = 80.0; // distance in front of the vehicle that object will be tracked
   action_ahead_dist = 50.0; // distance in front of the vehicle that control actions will be performed
-  look_behind_dist = 20.0; // distance behind the vehicle that object will be tracked
-  action_behind_dist = 10.0; // distance behind the vehicle that control actions will be performed
-  follow_dist = 20.0; // distance to follow a lead vehicle 
+  look_behind_dist = 30.0; // distance behind the vehicle that object will be tracked
+  action_behind_dist = 15.0; // distance behind the vehicle that control actions will be performed
+  follow_dist = 25.0; // distance to follow a lead vehicle 
   
   relative_vel_cost = 1; // cost of the difference between this vehicle and the objects velocity
   max_vel_cost = 1; // cost between the speed limit and the objects velocity
