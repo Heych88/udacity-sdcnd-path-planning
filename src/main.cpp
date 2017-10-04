@@ -129,7 +129,7 @@ int main() {
 
           // check the enviroment for surrounding vehicles and update the state machine if required
           action.setVehicleVariables(car_s, car_d, car_speed, prev_size);
-          int lane = action.getAction(sensor_fusion, ref_vel, too_close, state);
+          int lane = action.updateState(sensor_fusion, ref_vel, too_close, state);
 
           // Create a trajectory path based of the current vehicle surroundings 
           // and the current state machine state

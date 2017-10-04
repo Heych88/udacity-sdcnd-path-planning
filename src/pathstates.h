@@ -1,14 +1,8 @@
 /*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
-
-/* 
- * File:   pathstates.h
- * Author: haidyn
- *
- * Created on 3 October 2017, 9:53 PM
+ * pathstate.h
+ * 
+ * A Finite State Machine for path planning
+ * 
  */
 
 #ifndef PATHSTATES_H
@@ -45,7 +39,7 @@ public:
   void setVehicleVariables(const double s_car, const double d_car, const double speed_car, const int path_size);
   
   // Updates the vehicles finite state machine
-  int getAction(const vector<vector<double>> &sensor_fusion, double &ref_vel, bool &too_close, int &state);
+  int updateState(const vector<vector<double>> &sensor_fusion, double &ref_vel, bool &too_close, int &state);
   
   // Checks the surrounding road environment for objects and their locations
   void checkSurrounding(const vector<vector<double>> &sensor_fusion);
@@ -301,7 +295,7 @@ double NextAction::getFollowSpeed(bool &too_close)
  * @param state, the current state flag
  * @return updated lane number
  */
-int NextAction::getAction(const vector<vector<double>> &sensor_fusion, double &ref_vel, bool &too_close, int &state)
+int NextAction::updateState(const vector<vector<double>> &sensor_fusion, double &ref_vel, bool &too_close, int &state)
 {  
   double left_cost, right_cost; // total left and right lane costs
 
