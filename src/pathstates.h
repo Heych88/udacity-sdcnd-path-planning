@@ -39,13 +39,13 @@ public:
   void setVehicleVariables(const double s_car, const double d_car, const double speed_car, const int path_size);
   
   // Updates the vehicles finite state machine
-  int updateState(const vector<vector<double>> &sensor_fusion, double &ref_vel, bool &too_close, int &state);
+  int updateState(const vector<vector<double>> &sensor_fusion, double &ref_vel, int &state);
   
   // Checks the surrounding road environment for objects and their locations
   void checkSurrounding(const vector<vector<double>> &sensor_fusion);
   
   // Calculates the speed required to follow a lead vehicle at the desired distance
-  double getFollowSpeed(bool &too_close);
+  double getFollowSpeed();
   
 private:
   double car_s, car_d, car_speed, max_vel; // vehicle parameters
@@ -262,14 +262,10 @@ void NextAction::checkSurrounding(const vector<vector<double>> &sensor_fusion)
 
 /*
  * Calculates the speed required to follow a lead vehicle at the desired distance
- * @param too_close, flag for being to close (true) to the vehicle in front.
  * @return the desired speed
  */
-double NextAction::getFollowSpeed(bool &too_close)
+double NextAction::getFollowSpeed()
 {
-  // slow down if the car in front is less than 20m ahead
-  too_close = true;
-  
   double ref_vel;
 
   //stop the car if the object in front is stopped or we are very close to it
@@ -293,11 +289,10 @@ double NextAction::getFollowSpeed(bool &too_close)
  * Updates the vehicles finite state machine
  * @param sensor_fusion, sensor data of the surrounding environment
  * @param ref_vel, the desired vehicles velocity 
- * @param too_close, flag for being to close (true) to the vehicle in front
  * @param state, the current state flag
  * @return updated lane number
  */
-int NextAction::updateState(const vector<vector<double>> &sensor_fusion, double &ref_vel, bool &too_close, int &state)
+int NextAction::updateState(const vector<vector<double>> &sensor_fusion, double &ref_vel, int &state)
 {  
   double left_cost, right_cost; // total left and right lane costs
 
@@ -348,7 +343,7 @@ int NextAction::updateState(const vector<vector<double>> &sensor_fusion, double 
       if(center_front.distance_s < follow_dist) {
         state = PREP_CHANGE_LANE;
 
-        ref_vel = NextAction::getFollowSpeed(too_close);
+        ref_vel = NextAction::getFollowSpeed();
       } else {
         state = LANE_CLEAR;
       }
@@ -358,7 +353,7 @@ int NextAction::updateState(const vector<vector<double>> &sensor_fusion, double 
       
       // update the vehicles speed to match the speed of the object in the left lane
       if((center_front.distance_s < follow_dist) || (left_front.distance_s < follow_dist)) {
-        ref_vel = NextAction::getFollowSpeed(too_close);
+        ref_vel = NextAction::getFollowSpeed();
       } else {
         ref_vel = max_vel;
       }
@@ -378,7 +373,7 @@ int NextAction::updateState(const vector<vector<double>> &sensor_fusion, double 
       
       // update the vehicles speed to match the speed of the object in the right lane
       if((center_front.distance_s < follow_dist) || (right_front.distance_s < follow_dist)) {
-        ref_vel = NextAction::getFollowSpeed(too_close);
+        ref_vel = NextAction::getFollowSpeed();
       } else {
         ref_vel = max_vel;
       }

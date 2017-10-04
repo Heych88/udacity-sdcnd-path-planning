@@ -124,12 +124,9 @@ int main() {
             }
           }
 
-          // tarck if the vehicle is to close to the car in front and further action is required
-          bool too_close = false; 
-
           // check the enviroment for surrounding vehicles and update the state machine if required
           action.setVehicleVariables(car_s, car_d, car_speed, prev_size);
-          int lane = action.updateState(sensor_fusion, ref_vel, too_close, state);
+          int lane = action.updateState(sensor_fusion, ref_vel, state);
 
           // Create a trajectory path based of the current vehicle surroundings 
           // and the current state machine state
@@ -144,7 +141,7 @@ int main() {
           vector<double> next_y_vals;
 
           // define a path made up of (x,y) points that the car will visit sequentially every .02 seconds
-          car_tj.getTrajectoryPts(next_x_vals, next_y_vals, ref_vel, too_close);
+          car_tj.getTrajectoryPts(next_x_vals, next_y_vals, ref_vel);
 
           msgJson["next_x"] = next_x_vals;
           msgJson["next_y"] = next_y_vals;

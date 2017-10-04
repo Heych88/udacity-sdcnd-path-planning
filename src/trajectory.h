@@ -63,10 +63,10 @@ public:
   double solveSpline(const double x);
   
   // Creates the final trajectory path points
-  void getTrajectoryPts(vector<double> &next_x_vals, vector<double> &next_y_vals, const double ref_vel, const bool too_close);
+  void getTrajectoryPts(vector<double> &next_x_vals, vector<double> &next_y_vals, const double ref_vel);
   
   // Checks and adjusts each point step to prevent speeding 
-  void getStep(double &step, const double ref_vel, const bool too_close, double &x_local, double &y_local, double &prev_x_local, double &prev_y_local);
+  void getStep(double &step, const double ref_vel, double &x_local, double &y_local, double &prev_x_local, double &prev_y_local);
   
 private:
   int prev_size; // size of the previous trajectory points 
@@ -377,10 +377,9 @@ double Trajectory::solveSpline(const double x)
  * Creates the final trajectory path points
  * @param next_x_vals, vector to store the final paths x trajectory points
  * @param next_y_vals, vector to store the final paths y trajectory points
- * @param ref_vel, desired speed to be traveling in this directory
- * @param too_close, flag for being to close (true) to the vehicle in front.  
+ * @param ref_vel, desired speed to be traveling in this directory 
  */
-void Trajectory::getTrajectoryPts(vector<double> &next_x_vals, vector<double> &next_y_vals, const double ref_vel, const bool too_close) 
+void Trajectory::getTrajectoryPts(vector<double> &next_x_vals, vector<double> &next_y_vals, const double ref_vel)
 {
   double x_local = 0; // the current x point being considered
   double y_local, prev_x_local, prev_y_local;
@@ -411,7 +410,7 @@ void Trajectory::getTrajectoryPts(vector<double> &next_x_vals, vector<double> &n
   for(int i = 1; i < way_pts_tot - prev_size; i++){    
     
     // get the new (x,y) points and check that they are not causing speeding 
-    Trajectory::getStep(step, ref_vel, too_close, x_local, y_local, prev_x_local, prev_y_local);
+    Trajectory::getStep(step, ref_vel, x_local, y_local, prev_x_local, prev_y_local);
 
     // convert the reference point from local car reference frame to global coordinates
     double x_point = x_local * cos(global_yaw) - y_local * sin(global_yaw);
@@ -425,8 +424,7 @@ void Trajectory::getTrajectoryPts(vector<double> &next_x_vals, vector<double> &n
 /*
  * Calculates and adjusts each new (x, y) path point and prevents each step from speeding 
  * @param step, the previous points step value
- * @param ref_vel, desired speed to be traveling in this directory
- * @param too_close, flag for being to close (true) to the vehicle in front. 
+ * @param ref_vel, desired speed to be traveling in this directory 
  * @param x_local, new x point to check if it is speeding. This will be adjusted 
  *          to prevent speeding. 
  * @param y_local, new y point to check if it is speeding This will be adjusted 
@@ -434,25 +432,19 @@ void Trajectory::getTrajectoryPts(vector<double> &next_x_vals, vector<double> &n
  * @param prev_x_local, previous x point to calculate the velocity step between
  * @param prev_y_local, previous y point to calculate the velocity step between 
  */
-void Trajectory::getStep(double &step, const double ref_vel, const bool too_close, 
+void Trajectory::getStep(double &step, const double ref_vel, 
         double &x_local, double &y_local, double &prev_x_local, double &prev_y_local)
 {
-  double acceleration = 0.0022; // max allowed acceleration per step 8m/s^2
+  double acceleration = 0.0022; // max allowed acceleration per step 6m/s^2
   const double mile_ph_to_meter_ps = 1609.344 / 3600.0; // 1Mph * 1609.344meter/h / 3600 = 0.44704 m/s
   const double max_step = max_vel * mile_ph_to_meter_ps * 0.02;
   double ref_step = std::min<double>(ref_vel * mile_ph_to_meter_ps * 0.02, max_step);
   
   // check if we will potential have a collision and decelerate 
-  if(too_close){
-    step -= acceleration; // deceleration -8m/s
-    if(step < ref_step){
-      step = ref_step;
-    }
+  if((car_speed > ref_vel)){
+    step = std::max(step - acceleration, ref_step); // deceleration -6m/s
   } else if(car_speed < ref_vel){
-    step += acceleration;
-    if(step > ref_step){
-      step = ref_step;
-    }
+    step = std::min(step + acceleration, ref_step);
   } 
 
   x_local += step;
