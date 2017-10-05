@@ -41,6 +41,9 @@ public:
   // Updates the vehicles finite state machine
   int updateState(const vector<vector<double>> &sensor_fusion, double &ref_vel, int &state);
   
+  // calculates the cost of a detected object relative to the car
+  double getCost(const double object_speed, const double object_car_s);
+  
   // Checks the surrounding road environment for objects and their locations
   void checkSurrounding(const vector<vector<double>> &sensor_fusion);
   
@@ -60,6 +63,10 @@ private:
   
   // Action and tracking distance parameters for sensor fusion data
   double look_ahead_dist, action_ahead_dist, look_behind_dist, action_behind_dist, follow_dist;
+  
+  // add an offset to counter the sensor offset produced in the simulator which  
+  // predicts the vehicles position 15m ahead of the actual vehicles position.
+  double sensor_offset;
   
   // Tracked object parameters
   struct vehicle {
@@ -99,6 +106,8 @@ NextAction::NextAction(const double max_speed)
   left_ma.setSize(filter_size); // left lane moving average
   right_ma.setSize(filter_size); // right lane moving average
   current_ma.setSize(filter_size); // current vehicles lane moving average
+  
+  sensor_offset = 15.5;
 }
 
 /*
@@ -171,6 +180,26 @@ void NextAction::setVehicleVariables(const double s_car, const double d_car, con
 }
 
 /*
+ * calculates the cost of a detected object relative to the car
+ * @param object_speed, velocity of the object
+ * @param object_car_s, object fernet s position
+ */
+double NextAction::getCost(const double object_speed, const double object_car_s){
+  const double distance_s = object_car_s - car_s + sensor_offset;
+  
+  // velocity cost between this vehicle and the object speed
+  double cost = std::abs(car_speed - object_speed) * relative_vel_cost;
+  // velocity cost between the speed limit and the objects speed
+  cost += std::abs(max_vel - object_speed) * max_vel_cost;
+  // cost for the distance between this vehicle and the object 
+  cost += (1 - std::abs(distance_s) / look_ahead_dist) * s_cost;
+  // cost for the distance between this vehicle and the object 1 second in the future
+  cost += (std::abs((object_car_s + object_speed) - (car_s + car_speed) + sensor_offset) / look_ahead_dist) * s_cost;
+  
+  return cost;
+}
+
+/*
  * Checks the surrounding road environment for objects and their locations
  * @param sensor_fusion, sensor data of the surrounding environment
  */
@@ -183,24 +212,14 @@ void NextAction::checkSurrounding(const vector<vector<double>> &sensor_fusion)
     double vx = sensor_fusion[i][3];
     double vy = sensor_fusion[i][4];
     double object_speed = sqrt(vx*vx + vy*vy);
-    
-    // add an offset to counter the sensor offset produced in the simulator which  
-    // predicts the vehicles position 15m ahead of the actual vehicles position.
-    double sensor_offset = 15.5;
+
     double distance_s = object_car_s - car_s + sensor_offset; 
 
     // only look at objects 15m behind and take action distance action_ahead_dist in front that are in the 
     // lane to the left, right and same lane as travel
     if((d > (2+4*lane_left-1.8)) && (d < (2+4*lane_right+1.8)) && (distance_s > -look_behind_dist) && (distance_s < look_ahead_dist)){ 
 
-      // velocity cost between this vehicle and the object speed
-      double cost = std::abs(car_speed - object_speed) * relative_vel_cost;
-      // velocity cost between the speed limit and the objects speed
-      cost += std::abs(max_vel - object_speed) * max_vel_cost;
-      // cost for the distance between this vehicle and the object 
-      cost += (1 - std::abs(distance_s) / look_ahead_dist) * s_cost;
-      // cost for the distance between this vehicle and the object 1 second in the future
-      cost += (std::abs((object_car_s + object_speed) - (car_s + car_speed) + sensor_offset) / look_ahead_dist) * s_cost;
+      double cost = NextAction::getCost(object_speed, object_car_s);
       
       // Check if the vehicle is in same lane 
       if((d < (2+4*lane+1.8)) && (d > (2+4*lane-1.8)) && (distance_s > 0)){  
