@@ -339,6 +339,8 @@ void Trajectory::startPoints()
  */
 void Trajectory::makeSplinePts(const vector<double> map_waypoints_s, const vector<double> map_waypoints_x, const vector<double> map_waypoints_y) 
 {
+  Trajectory::startPoints(); // get the cars last points for a smooth transition
+          
   // Frenet coordinates are referenced from the center yellow lines and positive d being on the right.
   double next_d = 2 + 4 * lane; //calculate the cars center d position based on the desired lane
   // get select way points in the future to predict a spline functions for the desired path  
@@ -383,7 +385,7 @@ void Trajectory::getTrajectoryPts(vector<double> &next_x_vals, vector<double> &n
 {
   double x_local = 0; // the current x point being considered
   double y_local, prev_x_local, prev_y_local;
-  int way_pts_tot = 50; // how many way points are to be predicted into the future 
+  const int way_pts_tot = 50; // how many way points are to be predicted into the future 
   
   // Store the unused old way points to create a smooth path transition
   for(int i=0; i < prev_size; i++){

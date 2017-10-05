@@ -131,7 +131,7 @@ int main() {
           // Create a trajectory path based of the current vehicle surroundings 
           // and the current state machine state
           Trajectory car_tj(car_x, car_y, car_yaw, car_s, lane, previous_path_x, previous_path_y, car_speed, prev_size);
-          car_tj.startPoints();
+          //car_tj.startPoints();
           car_tj.makeSplinePts(map_waypoints_s, map_waypoints_x, map_waypoints_y);
 
           // create a function that intersects all points on the desired path
