@@ -124,14 +124,14 @@ int main() {
             }
           }
 
-          // check the enviroment for surrounding vehicles and update the state machine if required
+          // check the environment for surrounding vehicles and update the state machine if required
           action.setVehicleVariables(car_s, car_d, car_speed, prev_size);
           int lane = action.updateState(sensor_fusion, ref_vel, state);
 
           // Create a trajectory path based of the current vehicle surroundings 
           // and the current state machine state
           Trajectory car_tj(car_x, car_y, car_yaw, car_s, lane, previous_path_x, previous_path_y, car_speed, prev_size);
-          //car_tj.startPoints();
+
           car_tj.makeSplinePts(map_waypoints_s, map_waypoints_x, map_waypoints_y);
 
           // create a function that intersects all points on the desired path
