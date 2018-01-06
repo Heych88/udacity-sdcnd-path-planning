@@ -1,8 +1,8 @@
 /*
  * pathstate.h
- * 
+ *
  * A Finite State Machine for path planning
- * 
+ *
  */
 
 #ifndef PATHSTATES_H
@@ -31,25 +31,25 @@ class NextAction {
 public:
   // class initialiser
   NextAction(const double max_speed);
-  
+
   // destructor
   virtual ~NextAction();
-  
-  // Updates the vehicles values with the latest values 
+
+  // Updates the vehicles values with the latest values
   void setVehicleVariables(const double s_car, const double d_car, const double speed_car, const int path_size);
-  
+
   // Updates the vehicles finite state machine
   int updateState(const vector<vector<double>> &sensor_fusion, double &ref_vel, int &state);
-  
+
   // calculates the cost of a detected object relative to the car
   double getCost(const double object_speed, const double object_car_s);
-  
+
   // Checks the surrounding road environment for objects and their locations
   void checkSurrounding(const vector<vector<double>> &sensor_fusion);
-  
+
   // Calculates the speed required to follow a lead vehicle at the desired distance
   double getFollowSpeed();
-  
+
 private:
   double car_s, car_d, car_speed, max_vel; // vehicle parameters
   double relative_vel_cost, max_vel_cost, s_cost; // cost values parameters
@@ -57,32 +57,32 @@ private:
   int prev_size; // number of previous trajectory points to use
   int filter_size; // Moving average filter size
   bool is_gap_left, is_gap_right; // Store if there is a merge gap present (true) or not (false)
-  
-  // Total cost of all objects in a lane and there position in front or behind the vehicle  
-  double left_front_cost, right_front_cost, left_back_cost, right_back_cost, current_lane_cost; 
-  
+
+  // Total cost of all objects in a lane and there position in front or behind the vehicle
+  double left_front_cost, right_front_cost, left_back_cost, right_back_cost, current_lane_cost;
+
   // Action and tracking distance parameters for sensor fusion data
   double look_ahead_dist, action_ahead_dist, look_behind_dist, action_behind_dist, follow_dist;
-  
-  // add an offset to counter the sensor offset produced in the simulator which  
+
+  // add an offset to counter the sensor offset produced in the simulator which
   // predicts the vehicles position 15m ahead of the actual vehicles position.
   double sensor_offset;
-  
+
   // Tracked object parameters
   struct vehicle {
     double distance_s;
-    double speed;   
+    double speed;
   };
   // Specific positional objects to be tracked
   vehicle center_front, left_front, right_front, left_back, right_back;
-  MovingAverage left_ma, right_ma, current_ma; // moving average of each lanes cost  
+  MovingAverage left_ma, right_ma, current_ma; // moving average of each lanes cost
 };
-  
+
 /*
  * class initialiser
  * @param max_speed, maximum allowed speed of the vehicle
  */
-// TODO: Move the set class variables into the initialiser parameters so they can be set externally 
+// TODO: Move the set class variables into the initialiser parameters so they can be set externally
 NextAction::NextAction(const double max_speed)
 {
   car_s = 0; // Fernet s coordinate with respect to the vehicles reference frame
@@ -96,34 +96,36 @@ NextAction::NextAction(const double max_speed)
   action_ahead_dist = 50.0; // distance in front of the vehicle that control actions will be performed
   look_behind_dist = 30.0; // distance behind the vehicle that object will be tracked
   action_behind_dist = 15.0; // distance behind the vehicle that control actions will be performed
-  follow_dist = 25.0; // distance to follow a lead vehicle 
-  
+  follow_dist = 25.0; // distance to follow a lead vehicle
+
   relative_vel_cost = 1; // cost of the difference between this vehicle and the objects velocity
   max_vel_cost = 1; // cost between the speed limit and the objects velocity
-  s_cost = 100; // cost for the Fernet s distance between this vehicle and the object 
-  
+  s_cost = 100; // cost for the Fernet s distance between this vehicle and the object
+
   filter_size = 5; // number of past elements to calculate the moving average with
   left_ma.setSize(filter_size); // left lane moving average
   right_ma.setSize(filter_size); // right lane moving average
   current_ma.setSize(filter_size); // current vehicles lane moving average
-  
+
   sensor_offset = 15.5;
 }
 
 /*
  * destructor
  */
-NextAction::~NextAction() 
+NextAction::~NextAction()
 {
-  
+
 }
 
 /*
- * Updates and clears the vehicles values with the current values 
- * @param s_car, vehicles current Fernet s coordinate
- * @param d_car, vehicles current Fernet d coordinate
- * @param speed_car, vehicles current velocity
- * @param path_size, number of previous path coordinates to use
+ * Updates and clears the vehicles values with the current values
+ *
+ * Args
+ *     s_car, vehicles current Fernet s coordinate
+ *     d_car, vehicles current Fernet d coordinate
+ *     speed_car, vehicles current velocity
+ *     path_size, number of previous path coordinates to use
  */
 void NextAction::setVehicleVariables(const double s_car, const double d_car, const double speed_car, const int path_size)
 {
@@ -132,15 +134,15 @@ void NextAction::setVehicleVariables(const double s_car, const double d_car, con
   car_speed = speed_car;
   prev_size = path_size;
 
-  // initialise the current vehicle lane upon the first function call or under error  
+  // initialise the current vehicle lane upon the first function call or under error
   if(lane < 0){
     lane = car_d / 4;
   }
-  
+
   // get the lane number of the the neighbouring lanes
-  lane_left = std::max(lane-1, 0); 
+  lane_left = std::max(lane-1, 0);
   lane_right = std::min(lane+1, 2);
-  
+
   // There is always a merge gap but will be cleared in the checkSurrounding function
   is_gap_left = true;
   is_gap_right = true;
@@ -151,21 +153,21 @@ void NextAction::setVehicleVariables(const double s_car, const double d_car, con
   current_lane_cost = 0;
   right_front_cost = 0;
   right_back_cost = 0;
-  
-  // prevent the vehicle from going off the road or into on coming traffic based 
-  // on it current lane 
+
+  // prevent the vehicle from going off the road or into on coming traffic based
+  // on it current lane
   if(lane == 0){
     // prevent merging into on coming traffic
-    is_gap_left = false;  
-    left_front_cost = 10000; 
+    is_gap_left = false;
+    left_front_cost = 10000;
     left_back_cost = 10000;
   } else if(lane == 2){
     // prevent merging onto the road shoulder
-    is_gap_right = false;   
+    is_gap_right = false;
     right_front_cost = 10000;
     right_back_cost = 10000;
-  } 
-  
+  }
+
   // Clear the tracked vehicle struct values
   center_front.distance_s = 1000;
   center_front.speed = 1000;
@@ -181,27 +183,34 @@ void NextAction::setVehicleVariables(const double s_car, const double d_car, con
 
 /*
  * calculates the cost of a detected object relative to the car
- * @param object_speed, velocity of the object
- * @param object_car_s, object fernet s position
+ *
+ * Args
+ *     object_speed, velocity of the object
+ *     object_car_s, object fernet s position
+ *
+ * Return
+ *     calculated cost
  */
 double NextAction::getCost(const double object_speed, const double object_car_s){
   const double distance_s = object_car_s - car_s + sensor_offset;
-  
+
   // velocity cost between this vehicle and the object speed
   double cost = std::abs(car_speed - object_speed) * relative_vel_cost;
   // velocity cost between the speed limit and the objects speed
   cost += std::abs(max_vel - object_speed) * max_vel_cost;
-  // cost for the distance between this vehicle and the object 
+  // cost for the distance between this vehicle and the object
   cost += (1 - std::abs(distance_s) / look_ahead_dist) * s_cost;
   // cost for the distance between this vehicle and the object 1 second in the future
   cost += (std::abs((object_car_s + object_speed) - (car_s + car_speed) + sensor_offset) / look_ahead_dist) * s_cost;
-  
+
   return cost;
 }
 
 /*
  * Checks the surrounding road environment for objects and their locations
- * @param sensor_fusion, sensor data of the surrounding environment
+ *
+ * Args
+ *     sensor_fusion, sensor data of the surrounding environment
  */
 void NextAction::checkSurrounding(const vector<vector<double>> &sensor_fusion)
 {
@@ -213,18 +222,18 @@ void NextAction::checkSurrounding(const vector<vector<double>> &sensor_fusion)
     double vy = sensor_fusion[i][4];
     double object_speed = sqrt(vx*vx + vy*vy);
 
-    double distance_s = object_car_s - car_s + sensor_offset; 
+    double distance_s = object_car_s - car_s + sensor_offset;
 
-    // only look at objects 15m behind and take action distance action_ahead_dist in front that are in the 
+    // only look at objects 15m behind and take action distance action_ahead_dist in front that are in the
     // lane to the left, right and same lane as travel
-    if((d > (2+4*lane_left-1.8)) && (d < (2+4*lane_right+1.8)) && (distance_s > -look_behind_dist) && (distance_s < look_ahead_dist)){ 
+    if((d > (2+4*lane_left-1.8)) && (d < (2+4*lane_right+1.8)) && (distance_s > -look_behind_dist) && (distance_s < look_ahead_dist)){
 
       double cost = NextAction::getCost(object_speed, object_car_s);
-      
-      // Check if the vehicle is in same lane 
-      if((d < (2+4*lane+1.8)) && (d > (2+4*lane-1.8)) && (distance_s > 0)){  
+
+      // Check if the vehicle is in same lane
+      if((d < (2+4*lane+1.8)) && (d > (2+4*lane-1.8)) && (distance_s > 0)){
         current_lane_cost += cost;
-        
+
         // If the object is the closest object in that lane, store its parameters
         if(center_front.distance_s > distance_s){
           center_front.distance_s = distance_s;
@@ -234,21 +243,21 @@ void NextAction::checkSurrounding(const vector<vector<double>> &sensor_fusion)
         // check if the object is in the left lane
         if(distance_s > 0) { // is the object in front
           left_front_cost += cost;
-          
+
           if(left_front.distance_s > distance_s){
             left_front.distance_s = distance_s;
             left_front.speed = object_speed;
           }
         } else {
           left_back_cost += cost;
-          
+
           if(left_back.distance_s < distance_s){
             left_back.distance_s = distance_s;
             left_back.speed = object_speed;
           }
         }
-        
-        // check if there is a merge gap 
+
+        // check if there is a merge gap
         if((distance_s > -action_behind_dist) && (distance_s < follow_dist)){
           is_gap_left = false;
         }
@@ -256,32 +265,37 @@ void NextAction::checkSurrounding(const vector<vector<double>> &sensor_fusion)
         // check if the object is in the right lane
         if(distance_s > 0) { // is the object in front
           right_front_cost += cost;
-          
+
           if(right_front.distance_s > distance_s){
             right_front.distance_s = distance_s;
             right_front.speed = object_speed;
           }
         } else {
           right_back_cost += cost;
-          
+
           if(right_back.distance_s < distance_s){
             right_back.distance_s = distance_s;
             right_back.speed = object_speed;
           }
         }
-        
+
         // check if there is a merge gap
         if((distance_s > -action_behind_dist) && (distance_s < follow_dist)){
           is_gap_right = false;
         }
-      } 
+      }
     }
   }
 }
 
 /*
  * Calculates the speed required to follow a lead vehicle at the desired distance
- * @return the desired speed
+ *
+ * Args
+ *     None
+ *
+ * Return
+ *     the desired car speed to follow the lead vehicle
  */
 double NextAction::getFollowSpeed()
 {
@@ -300,19 +314,23 @@ double NextAction::getFollowSpeed()
   } else {
     ref_vel = center_front.speed; // slow down to the speed of the vehicle in front and follow it
   }
-  
+
   return ref_vel;
 }
 
 /*
  * Updates the vehicles finite state machine
- * @param sensor_fusion, sensor data of the surrounding environment
- * @param ref_vel, the desired vehicles velocity 
- * @param state, the current state flag
- * @return updated lane number
+ *
+ * Args
+ *     sensor_fusion, sensor data of the surrounding environment
+ *     ref_vel, the desired vehicles velocity
+ *     state, the current state flag
+ *
+ * Return
+ *    lane number to travel in
  */
 int NextAction::updateState(const vector<vector<double>> &sensor_fusion, double &ref_vel, int &state)
-{  
+{
   double left_cost, right_cost; // total left and right lane costs
 
   switch(state){
@@ -321,33 +339,33 @@ int NextAction::updateState(const vector<vector<double>> &sensor_fusion, double 
 
       // check the vehicles surrounds for objects
       NextAction::checkSurrounding(sensor_fusion);
-      
-      // Check if there is a vehicle in front and in same lane 
-      if(center_front.distance_s < action_ahead_dist){               
+
+      // Check if there is a vehicle in front and in same lane
+      if(center_front.distance_s < action_ahead_dist){
         state = PREP_CHANGE_LANE;
-      } 
+      }
       break;
     case(PREP_CHANGE_LANE):
       NextAction::checkSurrounding(sensor_fusion);
-      
+
       if(center_front.distance_s < follow_dist){
         state = FOLLOW;
       } else {
         state = LANE_CLEAR;
       }
-      
+
       // get the averaged cost of being in each lane
       left_cost = left_ma.nextAverage(left_front_cost);
       right_cost = right_ma.nextAverage(right_front_cost);
       current_lane_cost = current_ma.nextAverage(current_lane_cost);
 
       if(left_ma.getSize() >= filter_size){ // only evaluate costs if the filter is full
-        
-        // Find the lane with the lowest cost and favour passing on the left 
+
+        // Find the lane with the lowest cost and favour passing on the left
         if(is_gap_left && (left_cost <= right_cost) && (left_cost < current_lane_cost)){
           // change lanes to the left
           state = CHANGE_LEFT;
-          lane = std::max(lane - 1, 0); 
+          lane = std::max(lane - 1, 0);
         } else if(is_gap_right && (right_cost < left_cost) && (right_cost < current_lane_cost)){
           // change lanes to the right
           state = CHANGE_RIGHT;
@@ -357,7 +375,7 @@ int NextAction::updateState(const vector<vector<double>> &sensor_fusion, double 
       break;
     case(FOLLOW):
       NextAction::checkSurrounding(sensor_fusion);
-      
+
       // Check if the object in front is too close and slow down
       if(center_front.distance_s < follow_dist) {
         state = PREP_CHANGE_LANE;
@@ -369,18 +387,18 @@ int NextAction::updateState(const vector<vector<double>> &sensor_fusion, double 
       break;
     case(CHANGE_LEFT):
       NextAction::checkSurrounding(sensor_fusion);
-      
+
       // update the vehicles speed to match the speed of the object in the left lane
       if((center_front.distance_s < follow_dist) || (left_front.distance_s < follow_dist)) {
         ref_vel = NextAction::getFollowSpeed();
       } else {
         ref_vel = max_vel;
       }
-      
+
       // only update the state if the vehicle is in the center of the lane
       if((car_d < (2+4*lane+0.5)) && (car_d > (2+4*lane-0.5))){
         state = LANE_CLEAR;
-      } 
+      }
 
       // reset the moving average filter to start the new lane cost fresh
       left_ma.emptyQueue();
@@ -389,18 +407,18 @@ int NextAction::updateState(const vector<vector<double>> &sensor_fusion, double 
       break;
     case(CHANGE_RIGHT):
       NextAction::checkSurrounding(sensor_fusion);
-      
+
       // update the vehicles speed to match the speed of the object in the right lane
       if((center_front.distance_s < follow_dist) || (right_front.distance_s < follow_dist)) {
         ref_vel = NextAction::getFollowSpeed();
       } else {
         ref_vel = max_vel;
       }
-        
+
       // only update the state if the vehicle is in the center of the lane
       if((car_d < (2+4*lane+0.5)) && (car_d > (2+4*lane-0.5))){
         state = LANE_CLEAR;
-      } 
+      }
 
       left_ma.emptyQueue();
       right_ma.emptyQueue();
@@ -410,11 +428,10 @@ int NextAction::updateState(const vector<vector<double>> &sensor_fusion, double 
       // Should never get in this state but reset to default state
       state = LANE_CLEAR;
   }
-  
+
   state = state; // set the state for the next time around
-  
+
   return lane;
 }
 
 #endif /* PATHSTATES_H */
-
