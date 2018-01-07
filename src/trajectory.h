@@ -1,8 +1,8 @@
 /*
  * trajectory.h
- * 
+ *
  * A simple trajectory path generator for autonomous vehicles using a spline.
- * 
+ *
  */
 
 #ifndef TRAJECTORY_H
@@ -20,86 +20,88 @@ using namespace std;
 
 class Trajectory {
 public:
-  // class initialiser 
-  Trajectory(const double x_car, const double y_car, const double yaw_car, 
-          const double s_car, const double drive_lane, const vector<double> prev_path_x, 
+  // class initialiser
+  Trajectory(const double x_car, const double y_car, const double yaw_car,
+          const double s_car, const double drive_lane, const vector<double> prev_path_x,
           const vector<double> prev_path_y, const double speed_car, const int path_size);
-  
+
   // destructor
-  virtual ~Trajectory();    
-  
+  virtual ~Trajectory();
+
   // Converts degrees to radians
   double deg2rad(double x);
-  
+
   // Converts radians to degrees
   double rad2deg(double x);
-  
+
   // Calculates the Euclidean distance between x and y coordinate points
   double distance(double x1, double y1, double x2, double y2);
-  
+
   // Finds the closest map way point to the current vehicle position
   int ClosestWaypoint(double x, double y, const vector<double> &maps_x, const vector<double> &maps_y);
-  
+
   // finds the next map way point  from the current way point
   int NextWaypoint(double x, double y, double theta, const vector<double> &maps_x, const vector<double> &maps_y);
-  
+
   // Converts the map x & y points into Frenet coordinate points
   vector<double> getFrenet(double x, double y, double theta, const vector<double> &maps_x, const vector<double> &maps_y);
-  
+
   // Converts the map Frenet coordinate points into x & y points
   vector<double> getXY(double s, double d, const vector<double> &maps_s, const vector<double> &maps_x, const vector<double> &maps_y);
-  
-  // Gets the last trajectory points from the previous path or initialises them 
+
+  // Gets the last trajectory points from the previous path or initialises them
   // if there are no previous points to retrieve
   void startPoints();
-  
-  // Transform and convert the spline path into the vehicles reference frame 
+
+  // Transform and convert the spline path into the vehicles reference frame
   void makeSplinePts(const vector<double> map_waypoints_s, const vector<double> map_waypoints_x, const vector<double> map_waypoints_y);
-  
+
   // Create the spline that intersects all points on the desired path
   void getSpline();
-  
-  // Returns the splines y value at an x point 
+
+  // Returns the splines y value at an x point
   double solveSpline(const double x);
-  
+
   // Creates the final trajectory path points
   void getTrajectoryPts(vector<double> &next_x_vals, vector<double> &next_y_vals, const double ref_vel);
-  
-  // Checks and adjusts each point step to prevent speeding 
+
+  // Checks and adjusts each point step to prevent speeding
   void getStep(double &step, const double ref_vel, double &x_local, double &y_local, double &prev_x_local, double &prev_y_local);
-  
+
 private:
-  int prev_size; // size of the previous trajectory points 
+  int prev_size; // size of the previous trajectory points
   double max_vel; // max allowed vehicle velocity
   double waypoint_step; // distance between spline points
   tk::spline f_spline; // spline maths function variable
 
   double car_x, car_y, car_yaw, car_s, car_speed; // current vehicle parameters
-  
+
   // Car reference frame parameters for shifting between global and car reference frames
   double global_x, global_y, global_yaw;
-  
+
   // lane number to travel in the future. 0 -> left, 1 -> middle, 2 -> right
-  int lane; 
-  
-  vector<double> previous_path_x, previous_path_y; // previous trajectory (x,y) path points 
-  vector<double> ptsx, ptsy; // new trajectory (x,y) path points 
+  int lane;
+
+  vector<double> previous_path_x, previous_path_y; // previous trajectory (x,y) path points
+  vector<double> ptsx, ptsy; // new trajectory (x,y) path points
 };
 
 /*
  * class initialiser
- * @param x_car, the vehicles current x coordinate value
- * @param y_car, the vehicles current y coordinate value
- * @param yaw_car, the vehicles current yaw angle
- * @param s_car, the vehicles current Frenet s coordinate value
- * @param drive_lane, the desired vehicle lane in which the car will be in.
- * @param prev_path_x, the vehicles previous trajectory path of unused x points
- * @param prev_path_y, the vehicles previous trajectory path of unused y points
- * @param speed_car, the vehicles current speed
- * @param path_size, the number of desired points in the previous path to reuse
+ *
+ * Args
+ *     x_car, the vehicles current x coordinate value
+ *     y_car, the vehicles current y coordinate value
+ *     yaw_car, the vehicles current yaw angle
+ *     s_car, the vehicles current Frenet s coordinate value
+ *     drive_lane, the desired vehicle lane in which the car will be in.
+ *     prev_path_x, the vehicles previous trajectory path of unused x points
+ *     prev_path_y, the vehicles previous trajectory path of unused y points
+ *     speed_car, the vehicles current speed
+ *     path_size, the number of desired points in the previous path to reuse
  */
-Trajectory::Trajectory(const double x_car, const double y_car, const double yaw_car, 
-        const double s_car, const double drive_lane, const vector<double> prev_path_x, 
+Trajectory::Trajectory(const double x_car, const double y_car, const double yaw_car,
+        const double s_car, const double drive_lane, const vector<double> prev_path_x,
         const vector<double> prev_path_y, const double speed_car, const int path_size)
 {
   car_x = x_car;
@@ -112,13 +114,13 @@ Trajectory::Trajectory(const double x_car, const double y_car, const double yaw_
   previous_path_y = prev_path_y;
   car_speed = speed_car;
   prev_size = path_size;
-  
+
   waypoint_step = 25;
 }
 
-Trajectory::~Trajectory() 
+Trajectory::~Trajectory()
 {
-    
+
 }
 
 // For converting back and forth between radians and degrees.
@@ -127,11 +129,15 @@ double Trajectory::rad2deg(double x) { return x * 180 / M_PI; }
 
 /*
  * Calculates the Euclidean distance between x and y coordinate points
- * @param x1, coordinate point one x value 
- * @param y1, coordinate point one y value 
- * @param x2, coordinate point two x value 
- * @param y2, coordinate point two y value 
- * @return Euclidean distance
+ *
+ * Args
+ *      x1, coordinate point one x value
+ *      y1, coordinate point one y value
+ *      x2, coordinate point two x value
+ *      y2, coordinate point two y value
+ *
+ * Return
+ *     Euclidean distance
  */
 double Trajectory::distance(double x1, double y1, double x2, double y2)
 {
@@ -140,11 +146,15 @@ double Trajectory::distance(double x1, double y1, double x2, double y2)
 
 /*
  * Finds the closest map way point to the current vehicle position
- * @param x, current vehicles coordinate x point 
- * @param y, current vehicles coordinate y point 
- * @param maps_x, global maps x points
- * @param maps_y, global maps y points
- * @return the index location of the nearest way point
+ *
+ * Args
+ *      x, current vehicles coordinate x point
+ *      y, current vehicles coordinate y point
+ *      maps_x, global maps x points
+ *      maps_y, global maps y points
+ *
+ * Return
+ *      the index location of the nearest way point
  */
 int Trajectory::ClosestWaypoint(double x, double y, const vector<double> &maps_x, const vector<double> &maps_y)
 {
@@ -167,12 +177,16 @@ int Trajectory::ClosestWaypoint(double x, double y, const vector<double> &maps_x
 
 /*
  * finds the next map way point from the current (x, y) position
- * @param x, current vehicles coordinate x point 
- * @param y, current vehicles coordinate y point 
- * @param theta, current vehicles heading direction in radians
- * @param maps_x, global maps x points
- * @param maps_y, global maps y points
- * @return the index location of the nearest way point
+ *
+ * Args
+ *      x, current vehicles coordinate x point
+ *      y, current vehicles coordinate y point
+ *      theta, current vehicles heading direction in radians
+ *      maps_x, global maps x points
+ *      maps_y, global maps y points
+ *
+ * Return
+ *      the index location of the nearest way point
  */
 int Trajectory::NextWaypoint(double x, double y, double theta, const vector<double> &maps_x, const vector<double> &maps_y)
 {
@@ -195,12 +209,16 @@ int Trajectory::NextWaypoint(double x, double y, double theta, const vector<doub
 
 /*
  * Transform from Cartesian (x,y) coordinates to Frenet (s,d) coordinates
- * @param x, current vehicles coordinate x point 
- * @param y, current vehicles coordinate y point 
- * @param theta, current vehicles heading direction in radians
- * @param maps_x, global maps x points
- * @param maps_y, global maps y points
- * @return the vehicles (s,d) coordinates
+ *
+ * Args
+ *      x, current vehicles coordinate x point
+ *      y, current vehicles coordinate y point
+ *      theta, current vehicles heading direction in radians
+ *      maps_x, global maps x points
+ *      maps_y, global maps y points
+ *
+ * Return
+ *      the vehicles (s,d) coordinates
  */
 vector<double> Trajectory::getFrenet(double x, double y, double theta, const vector<double> &maps_x, const vector<double> &maps_y)
 {
@@ -252,12 +270,16 @@ vector<double> Trajectory::getFrenet(double x, double y, double theta, const vec
 
 /*
  * Transform from Frenet (s,d) coordinates to Cartesian (x,y)
- * @param x, current vehicles coordinate x point 
- * @param y, current vehicles coordinate y point 
- * @param maps_s, global maps s points
- * @param maps_x, global maps x points
- * @param maps_y, global maps y points
- * @return the vehicles (s,d) coordinates
+ *
+ * Args
+ *      x, current vehicles coordinate x point
+ *      y, current vehicles coordinate y point
+ *      maps_s, global maps s points
+ *      maps_x, global maps x points
+ *      maps_y, global maps y points
+ *
+ * Return
+ *      the vehicles (s,d) coordinates
  */
 vector<double> Trajectory::getXY(double s, double d, const vector<double> &maps_s, const vector<double> &maps_x, const vector<double> &maps_y)
 {
@@ -287,12 +309,15 @@ vector<double> Trajectory::getXY(double s, double d, const vector<double> &maps_
 }
 
 /*
- * Gets the last trajectory points from the previous path or initialises them 
+ * Gets the last trajectory points from the previous path or initialises them
  * if there are no previous points to retrieve.
+ *
+ * Return
+ *      None
  */
 void Trajectory::startPoints()
 {
-  // check if there are previous way points that can be used 
+  // check if there are previous way points that can be used
   if(prev_size < 2){
     global_x = car_x;
     global_y = car_y;
@@ -306,7 +331,7 @@ void Trajectory::startPoints()
     ptsy.push_back(shift_x*sin(0-global_yaw) + shift_y*cos(0-global_yaw));
 
     // store the cars current coordinates and transform them into the cars reference frame
-    // since the current car coordinates are the origin store (0,0) 
+    // since the current car coordinates are the origin store (0,0)
     ptsx.push_back(0);
     ptsy.push_back(0);
   } else {
@@ -325,7 +350,7 @@ void Trajectory::startPoints()
     ptsy.push_back(shift_x*sin(0-global_yaw) + shift_y*cos(0-global_yaw));
 
     // store the cars current coordinates and transform them into the cars reference frame
-    // since the current car coordinates are the origin store (0,0) 
+    // since the current car coordinates are the origin store (0,0)
     ptsx.push_back(0);
     ptsy.push_back(0);
   }
@@ -333,17 +358,24 @@ void Trajectory::startPoints()
 
 /*
  * Transform and convert the spline path into the vehicles reference frame
- * @param map_waypoints_s, global maps s points
- * @param map_waypoints_x, global maps x points
- * @param map_waypoints_y, global maps y points
+ *
+ * Args
+ *      x, current vehicles coordinate x point
+ *      y, current vehicles coordinate y point
+ *      map_waypoints_s, global maps s points
+ *      map_waypoints_x, global maps x points
+ *      map_waypoints_y, global maps y points
+ *
+ * Return
+ *      None
  */
-void Trajectory::makeSplinePts(const vector<double> map_waypoints_s, const vector<double> map_waypoints_x, const vector<double> map_waypoints_y) 
+void Trajectory::makeSplinePts(const vector<double> map_waypoints_s, const vector<double> map_waypoints_x, const vector<double> map_waypoints_y)
 {
   Trajectory::startPoints(); // get the cars last points for a smooth transition
-          
+
   // Frenet coordinates are referenced from the center yellow lines and positive d being on the right.
   double next_d = 2 + 4 * lane; //calculate the cars center d position based on the desired lane
-  // get select way points in the future to predict a spline functions for the desired path  
+  // get select way points in the future to predict a spline functions for the desired path
   for(int i=1; i <= 3; i++){
     vector<double> xy_pts = Trajectory::getXY(car_s+(i*waypoint_step), next_d, map_waypoints_s, map_waypoints_x, map_waypoints_y);
 
@@ -358,6 +390,9 @@ void Trajectory::makeSplinePts(const vector<double> map_waypoints_s, const vecto
 
 /*
  *  Create the spline that intersects all points on the desired path
+ *
+ * Return
+ *      None
  */
 void Trajectory::getSpline()
 {
@@ -366,9 +401,13 @@ void Trajectory::getSpline()
 }
 
 /*
- * Returns the splines y value at an x point 
- * @param x, x point to find the corresponding y value
- * @return corresponding y value
+ * Returns the splines y value at an x point
+ *
+ * Args
+ *      x, x point to find the corresponding y value
+ *
+ * Return
+ *      corresponding y value
  */
 double Trajectory::solveSpline(const double x)
 {
@@ -377,16 +416,21 @@ double Trajectory::solveSpline(const double x)
 
 /*
  * Creates the final trajectory path points
- * @param next_x_vals, vector to store the final paths x trajectory points
- * @param next_y_vals, vector to store the final paths y trajectory points
- * @param ref_vel, desired speed to be traveling in this directory 
+ *
+ * Args
+ *      next_x_vals, vector to store the final paths x trajectory points
+ *      next_y_vals, vector to store the final paths y trajectory points
+ *      ref_vel, desired speed to be traveling in this directory
+ *
+ * Return
+ *      None
  */
 void Trajectory::getTrajectoryPts(vector<double> &next_x_vals, vector<double> &next_y_vals, const double ref_vel)
 {
   double x_local = 0; // the current x point being considered
   double y_local, prev_x_local, prev_y_local;
-  const int way_pts_tot = 50; // how many way points are to be predicted into the future 
-  
+  const int way_pts_tot = 50; // how many way points are to be predicted into the future
+
   // Store the unused old way points to create a smooth path transition
   for(int i=0; i < prev_size; i++){
     next_x_vals.push_back(previous_path_x[i]);
@@ -396,22 +440,22 @@ void Trajectory::getTrajectoryPts(vector<double> &next_x_vals, vector<double> &n
   double step;
   int next_size = next_x_vals.size();
   // get the previous step between the last two previous trajectory points and set
-  // that as the step size to prevent excess acceleration and jerk 
+  // that as the step size to prevent excess acceleration and jerk
   if(next_size < 2){
     step = 0;
   } else {
     double step_x = next_x_vals[next_size - 1] - next_x_vals[next_size - 2];
     double step_y = next_y_vals[next_size - 1] - next_y_vals[next_size - 2];
     step = sqrt(step_x*step_x + step_y*step_y);
-    
+
     prev_x_local = step_x;
     prev_y_local = step_y;
   }
 
-  // add new points onto the old way points upto 
-  for(int i = 1; i < way_pts_tot - prev_size; i++){    
-    
-    // get the new (x,y) points and check that they are not causing speeding 
+  // add new points onto the old way points upto
+  for(int i = 1; i < way_pts_tot - prev_size; i++){
+
+    // get the new (x,y) points and check that they are not causing speeding
     Trajectory::getStep(step, ref_vel, x_local, y_local, prev_x_local, prev_y_local);
 
     // convert the reference point from local car reference frame to global coordinates
@@ -424,34 +468,39 @@ void Trajectory::getTrajectoryPts(vector<double> &next_x_vals, vector<double> &n
 }
 
 /*
- * Calculates and adjusts each new (x, y) path point and prevents each step from speeding 
- * @param step, the previous points step value
- * @param ref_vel, desired speed to be traveling in this directory 
- * @param x_local, new x point to check if it is speeding. This will be adjusted 
- *          to prevent speeding. 
- * @param y_local, new y point to check if it is speeding This will be adjusted 
- *          to prevent speeding. 
- * @param prev_x_local, previous x point to calculate the velocity step between
- * @param prev_y_local, previous y point to calculate the velocity step between 
+ * Calculates and adjusts each new (x, y) path point and prevents each step from speeding
+ *
+ * Args
+ *      step, the previous points step value
+ *      ref_vel, desired speed to be traveling in this directory
+ *      x_local, new x point to check if it is speeding. This will be adjusted
+ *          to prevent speeding.
+ *      y_local, new y point to check if it is speeding This will be adjusted
+ *          to prevent speeding.
+ *      prev_x_local, previous x point to calculate the velocity step between
+ *      prev_y_local, previous y point to calculate the velocity step between
+ *
+ * Return
+ *      None
  */
-void Trajectory::getStep(double &step, const double ref_vel, 
+void Trajectory::getStep(double &step, const double ref_vel,
         double &x_local, double &y_local, double &prev_x_local, double &prev_y_local)
 {
   double acceleration = 0.0022; // max allowed acceleration per step 6m/s^2
   const double mile_ph_to_meter_ps = 1609.344 / 3600.0; // 1Mph * 1609.344meter/h / 3600 = 0.44704 m/s
   const double max_step = max_vel * mile_ph_to_meter_ps * 0.02;
   double ref_step = std::min<double>(ref_vel * mile_ph_to_meter_ps * 0.02, max_step);
-  
-  // check if we will potential have a collision and decelerate 
+
+  // check if we will potential have a collision and decelerate
   if((car_speed > ref_vel)){
     step = std::max(step - acceleration, ref_step); // deceleration -6m/s
   } else if(car_speed < ref_vel){
     step = std::min(step + acceleration, ref_step);
-  } 
+  }
 
   x_local += step;
   y_local = Trajectory::solveSpline(x_local);
-  
+
   // FIXME: fix velocity step check below as it causes excessive jerk on back part of track
   double diff_x = x_local - prev_x_local;
   double diff_y = y_local - prev_y_local;
@@ -477,4 +526,3 @@ void Trajectory::getStep(double &step, const double ref_vel,
 }
 
 #endif /* TRAJECTORY_H */
-
