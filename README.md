@@ -2,9 +2,9 @@ This repository contains the project solution to Udacities semester 3 Project 1:
 
  [![MPC in action](images/video.png)](https://youtu.be/Ea4QmE2k3j4)
 
-## Writeup
+## Project website
 
-The [writeup.md](writeup.md) contains details of the code and mathematical derivations used in this project.
+This repository has an accompanying project page, contains the theory and details behind the code. It can be found [here](https://www.haidynmcleod.com/path-planning).
 
 ### Simulator.
 You can download the Term3 Simulator which contains the Path Planning Project from the [releases tab (https://github.com/udacity/self-driving-car-sim/releases).
