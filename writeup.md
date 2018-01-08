@@ -74,7 +74,7 @@ Collision avoidance and the finite state machine code can be located in the head
 
 ###### Task 1: Move into the current system state function
 
-Each state is located by the use of a switch statement in the function `NextAction::updateState`, between line 314 and 417.
+Each state is located by the use of a switch statement in the function `NextAction::updateState`, between line 321 and 435.
 
 There are five system states;
 1. *lane clear* - For current lane driving at the speed limit.
@@ -89,7 +89,7 @@ How the system flows from state to state is illustrated below in the state diagr
 
 ###### Task 2: Check sensor data for surrounding objects
 
-Each state updates the vehicle surroundings by calling the function `NextAction::checkSurrounding()` with the latest sensor fusion data. The function is located between lines 206 and 280.
+Each state updates the vehicle surroundings by calling the function `NextAction::checkSurrounding()` with the latest sensor fusion data. The function is located between lines 210 and 289.
 
 This function iterates through the tracked objects from the sensor fusion data. An object is only checked if their position is in either the current lane or the lanes on the left or the right. Objects Frenet S distance is only considered if the object is within a set distance from the vehicle, as set with the variables `look_ahead_dist` and `look_behind_dist`, set on lines 96 and 97 respectively.
 
@@ -101,22 +101,22 @@ The function performs three tasks on objects that meet the positional requiremen
 2. Check for a merge gaps
 3. Locate and store the nearest objects data
 
-The costs are calculated in the function `NextAction::getCost()`, located between lines 187 and 200. The accumulated objects costs are;
+The costs are calculated in the function `NextAction::getCost()`, located between lines 184 and 207. The accumulated objects costs are;
 1. The velocity cost between the vehicle and the object speed.
 2. The velocity cost between the speed limit and the objects speed.
 3. The Frenet s distance between the vehicle and the object.
 4. The Frenet s distance between the vehicle and the object, one second in the future.
 
 The object costs are added together based on the position of the object relative to the vehicle. That is the cost is broken into five sections;
-1. Lane on the left and in front, line 236
-2. Current vehicles lane and in front, line 226
-3. Lane on the right and in front, line 258
-4. Lane on the right and behind, line 265
-4. Lane on the left and behind, line 243
+1. Lane on the left and in front, line 245
+2. Current vehicles lane and in front, line 235
+3. Lane on the right and in front, line 267
+4. Lane on the right and behind, line 274
+4. Lane on the left and behind, line 252
 
-The costs are used to find the fastest travelling lane with the smallest amount of traffic on it, but will not find a mergeable gap in a lane. Upon setting the latest vehicle data, by calling function `NextAction::setVehicleVariables()`, line 128, a merge gap is assumed and the corresponding variables `is_gap_left` and `is_gap_right` are set to true. However, it will be set to false if the position of the object is within a merge window, as set with the variables `follow_dist` and `action_behind_dist`, set on lines 99 and 98 respectively. The `is_gap_left` merge check is performed on lines 252 and 253 and `is_gap_right` on lines 274 and 275.
+The costs are used to find the fastest travelling lane with the smallest amount of traffic on it, but will not find a mergeable gap in a lane. Upon setting the latest vehicle data, by calling function `NextAction::setVehicleVariables()`, line 130, a merge gap is assumed and the corresponding variables `is_gap_left` and `is_gap_right` are set to true. However, it will be set to false if the position of the object is within a merge window, as set with the variables `follow_dist` and `action_behind_dist`, set on lines 99 and 98 respectively. The `is_gap_left` merge check is performed on lines 261 and 263 and `is_gap_right` on lines 283 and 285.
 
-The storing of the nearest object in each lane is broken down into the same five sections as outlined in the cost. The closest objects Frenet S and speed are then stored in a class struct for use in the finite state machine. The code for setting the five object struct values are located between lines 229 and 270.
+The storing of the nearest object in each lane is broken down into the same five sections as outlined in the cost. The closest objects Frenet S and speed are then stored in a class struct for use in the finite state machine. The code for setting the five object struct values are located between lines 238 and 278.
 
 ###### Task 3: Check if the objects violate safety or collisions
 
@@ -124,21 +124,21 @@ After the `NextAction::checkSurrounding()` function has returned, each state wil
 
 Avoiding collisions is performed differently between states, but all state will first check if there is an object in the same lane that requires the vehicle to slow down and follow. The following distance is set with the variable `follow_dist`, set on line 99. When an object is within this distance, the desired vehicle velocity is dropped to match the lead vehicles velocity by calling the function `NextAction::getFollowSpeed()`, located between lines 286 and 305. The function is only called when in the *follow*, *change left* and *change right* states. This feature adjusts the vehicles desired velocity, dependent on the distance to the lead object and stops the vehicle when the object is nearly stationary or less than 5m away.
 
-The state *prep change lane* will perform an additional task to prevent collisions. It will compare all lane costs and will attempt to move or stay in the lane that has the lowest cost value. When either the left or right lanes have a lower cost, it will wait until the `is_gap_left` or `is_gap_right` indicate a safe merge gap is present. The code for merge request is checked between lines 344 and 356.
+The state *prep change lane* will perform an additional task to prevent collisions. It will compare all lane costs and will attempt to move or stay in the lane that has the lowest cost value. When either the left or right lanes have a lower cost, it will wait until the `is_gap_left` or `is_gap_right` indicate a safe merge gap is present. The code for merge request is checked between lines 365 and 373.
 
 ###### Task 4: Update the state
 
-During collision and safety checks, each state will either change or remain in the same state. The transition between states in outlined in the Finite state machine diagram in task 1. All state updates are updated during the safety and collision checks described in task 3 and only in the function `NextAction::updateState`, between line 314 and 417.
+During collision and safety checks, each state will either change or remain in the same state. The transition between states in outlined in the Finite state machine diagram in task 1. All state updates are updated during the safety and collision checks described in task 3 and only in the function `NextAction::updateState`, between line 322 and 435.
 
 #### 5. The car stays in its lane, except for the time between changing lanes.
 
 The following functions are found in the header file `trajectory.h`.
 
-As the Frenet (s, d) coordinate system follows the centre yellow line. The function `Trajectory::makeSplinePts()`, located between line 340 and 357, uses a group of s points spaced 25m apart starting at the cars current s position are converted them, along with the same desired lanes centre d value, into cartesian coordinates using the function `Trajectory::getXY()`, located between line 262 and 287. These spaced x & y points are then transformed into the vehicle reference frame.  
+As the Frenet (s, d) coordinate system follows the centre yellow line. The function `Trajectory::makeSplinePts()`, located between line 359 and 389, uses a group of s points spaced 25m apart starting at the cars current s position are converted them, along with the same desired lanes centre d value, into cartesian coordinates using the function `Trajectory::getXY()`, located between line 262 and 287. These spaced x & y points are then transformed into the vehicle reference frame.  
 
-Once the points have been set, the function `Trajectory::getSpline()`, located between line 362 and 366, uses a spline function to link the points along the path smoothly.
+Once the points have been set, the function `Trajectory::getSpline()`, located between line 391 and 401, uses a spline function to link the points along the path smoothly.
 
-Following this the vehicles trajectory path is created by calling the function `Trajectory::getTrajectoryPts()`, between lines 384 and 424. This code uses the calculated spline function to produce vehicles trajectory waypoints along the road for every 20ms simulator update. The number of waypoints calculated is set with the variable `way_pts_tot`, on line 388.
+Following this the vehicles trajectory path is created by calling the function `Trajectory::getTrajectoryPts()`, between lines 417 and 468. This code uses the calculated spline function to produce vehicles trajectory waypoints along the road for every 20ms simulator update. The number of waypoints calculated is set with the variable `way_pts_tot`, on line 432.
 
 #### 6. The car is able to change lanes
 
